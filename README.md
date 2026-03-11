@@ -1,2 +1,2 @@
 # Statisfaction-
-a tool that agregate sport data and presents it in a nice way.
+a tool that agregates sport data and presents it in a nice way.
