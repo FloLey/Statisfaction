@@ -17,7 +17,6 @@ services:
 
   migrate:
     image: ${BACKEND_IMAGE:-ghcr.io/floley/statisfaction-backend}:${IMAGE_TAG:-latest}
-    env_file: .env
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db/${POSTGRES_DB}
     command: alembic upgrade head
@@ -29,9 +28,9 @@ services:
 
   backend:
     image: ${BACKEND_IMAGE:-ghcr.io/floley/statisfaction-backend}:${IMAGE_TAG:-latest}
-    env_file: .env
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db/${POSTGRES_DB}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
     ports:
       - "8001:8000"
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000

@@ -41,6 +41,7 @@ describe("App", () => {
 
     await waitFor(() => {
       expect(api.createTodo).toHaveBeenCalledWith("New todo");
+      expect(screen.getByText("New todo")).toBeInTheDocument();
     });
   });
 
@@ -54,6 +55,7 @@ describe("App", () => {
 
     await waitFor(() => {
       expect(api.deleteTodo).toHaveBeenCalledWith(1);
+      expect(screen.queryByText("Buy milk")).not.toBeInTheDocument();
     });
   });
 });

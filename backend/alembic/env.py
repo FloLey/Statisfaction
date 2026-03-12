@@ -16,7 +16,9 @@ from app import models  # noqa: E402, F401
 
 target_metadata = Base.metadata
 
-DATABASE_URL = os.environ["DATABASE_URL"]
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL environment variable is not set")
 
 
 def run_migrations_offline():
