@@ -49,22 +49,23 @@ jobs:
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H 100.109.197.38 >> ~/.ssh/known_hosts
+
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: 100.109.197.38
-          port: 22
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            cd /opt/Statisfaction
-            cat > .env <<'EOF'
-            POSTGRES_DB=statisfactory
-            POSTGRES_USER=statisfactory_user
-            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-            ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS }}
-            BACKEND_IMAGE=ghcr.io/floley/statisfaction-backend
-            FRONTEND_IMAGE=ghcr.io/floley/statisfaction-frontend
-            IMAGE_TAG=latest
-            EOF
-            docker compose pull && docker compose up -d --remove-orphans
+        run: |
+          ssh -i ~/.ssh/id_rsa ${{ secrets.VPS_USER }}@100.109.197.38 "cat > /opt/Statisfaction/.env" <<'ENVEOF'
+          POSTGRES_DB=statisfactory
+          POSTGRES_USER=statisfactory_user
+          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS }}
+          BACKEND_IMAGE=ghcr.io/floley/statisfaction-backend
+          FRONTEND_IMAGE=ghcr.io/floley/statisfaction-frontend
+          IMAGE_TAG=latest
+          ENVEOF
+          ssh -i ~/.ssh/id_rsa ${{ secrets.VPS_USER }}@100.109.197.38 \
+            "cd /opt/Statisfaction && docker compose pull && docker compose up -d --remove-orphans"
