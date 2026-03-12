@@ -58,7 +58,7 @@ Requires a running PostgreSQL instance (or use the dev compose DB):
 ```bash
 cd backend
 pip install -r requirements.txt
-TEST_DATABASE_URL=postgresql+asyncpg://statisfaction:statisfaction@localhost:5432/statisfactiondb_test pytest
+TEST_DATABASE_URL=postgresql+asyncpg://statisfaction:statisfaction@localhost:5433/statisfactiondb_test pytest
 ```
 
 ### Frontend
