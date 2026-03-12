@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { getTodos, createTodo, deleteTodo, Todo } from "./api";
 import AddTodo from "./components/AddTodo";
 import TodoList from "./components/TodoList";
+import "./App.css";
 
 export default function App() {
   const [todos, setTodos] = useState<Todo[]>([]);
@@ -23,6 +24,7 @@ export default function App() {
     try {
       const todo = await createTodo(title);
       setTodos((prev) => [todo, ...prev]);
+      setError(null);
     } catch {
       setError("Failed to create todo.");
     }
@@ -38,11 +40,26 @@ export default function App() {
   };
 
   return (
-    <main style={{ maxWidth: 600, margin: "2rem auto", fontFamily: "sans-serif", padding: "0 1rem" }}>
-      <h1>Todo List</h1>
-      {error && <p style={{ color: "red" }}>{error}</p>}
-      <AddTodo onAdd={handleAdd} />
-      <TodoList todos={todos} onDelete={handleDelete} />
-    </main>
+    <div className="app">
+      <header className="app-header">
+        <h1>Statisfaction</h1>
+        <p>Keep track of what needs doing</p>
+      </header>
+
+      {error && (
+        <div className="error-banner" role="alert">
+          {error}
+        </div>
+      )}
+
+      <div className="card">
+        <AddTodo onAdd={handleAdd} />
+        <TodoList todos={todos} onDelete={handleDelete} />
+      </div>
+
+      <footer className="app-footer">
+        {todos.length > 0 && `${todos.length} item${todos.length !== 1 ? "s" : ""}`}
+      </footer>
+    </div>
   );
 }
