@@ -16,7 +16,7 @@ services:
       retries: 10
 
   backend:
-    image: ghcr.io/floley/statisfaction-backend:latest
+    image: ghcr.io/floley/statisfaction-backend:${IMAGE_TAG:-latest}
     env_file: .env
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db/${POSTGRES_DB}
@@ -30,7 +30,7 @@ services:
       - internal
 
   frontend:
-    image: ghcr.io/floley/statisfaction-frontend:latest
+    image: ghcr.io/floley/statisfaction-frontend:${IMAGE_TAG:-latest}
     ports:
       - "5174:80"
     networks:
