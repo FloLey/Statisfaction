@@ -1,0 +1,4 @@
+exclude = ["alembic/"]
+
+[lint]
+select = ["E", "F", "I"]
