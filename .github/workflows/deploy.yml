@@ -43,8 +43,6 @@ jobs:
           tags: |
             ghcr.io/${{ env.OWNER_LC }}/statisfaction-frontend:latest
             ghcr.io/${{ env.OWNER_LC }}/statisfaction-frontend:${{ github.sha }}
-          build-args: |
-            VITE_API_URL=${{ secrets.VITE_API_URL }}
 
   deploy:
     runs-on: ubuntu-latest
@@ -63,9 +61,4 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 22
           script: |
-            cd /opt/statisfaction
-            git fetch origin main
-            git reset --hard origin/main
-            docker compose pull
-            docker compose up -d --remove-orphans
-            docker image prune -f
+            /opt/statisfaction/scripts/deploy_prod.sh
