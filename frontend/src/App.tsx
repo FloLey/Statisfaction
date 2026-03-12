@@ -18,6 +18,7 @@ export default function App() {
   }, []);
 
   async function handleAdd(title: string) {
+    setError(null);
     try {
       const todo = await createTodo(title);
       setTodos((prev) => [todo, ...prev]);
@@ -28,6 +29,7 @@ export default function App() {
   }
 
   async function handleDelete(id: number) {
+    setError(null);
     try {
       await deleteTodo(id);
       setTodos((prev) => prev.filter((t) => t.id !== id));
