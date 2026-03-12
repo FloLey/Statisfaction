@@ -1,3 +1,4 @@
+import os
 import subprocess
 from contextlib import asynccontextmanager
 
@@ -9,6 +10,9 @@ from sqlalchemy import select
 from .database import get_db
 from .models import Todo
 from .schemas import TodoCreate, TodoRead
+
+_cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5174")
+CORS_ORIGINS = [o.strip() for o in _cors_origins.split(",")]
 
 
 def run_migrations() -> None:
@@ -25,9 +29,9 @@ app = FastAPI(title="Statisfaction API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=CORS_ORIGINS,
+    allow_methods=["GET", "POST", "DELETE"],
+    allow_headers=["Content-Type"],
 )
 
 
