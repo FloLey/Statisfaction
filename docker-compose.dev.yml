@@ -8,6 +8,11 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-statisfactiondb}
     volumes:
       - pgdata_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-statisfaction} -d ${POSTGRES_DB:-statisfactiondb}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     networks:
       - internal
 
@@ -22,7 +27,8 @@ services:
     volumes:
       - ./backend:/app
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - internal
 
