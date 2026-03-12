@@ -2,6 +2,7 @@ import os
 import subprocess
 from pathlib import Path
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
@@ -16,8 +17,9 @@ TEST_DATABASE_URL = os.environ.get(
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
 
-@pytest_asyncio.fixture(scope="session")
-async def test_engine():
+@pytest.fixture(scope="session", autouse=True)
+def run_migrations():
+    """Run migrations once for the whole test session (sync, no event loop issues)."""
     env = {**os.environ, "DATABASE_URL": TEST_DATABASE_URL}
     subprocess.run(
         ["alembic", "upgrade", "head"],
@@ -25,6 +27,11 @@ async def test_engine():
         cwd=BACKEND_DIR,
         env=env,
     )
+
+
+@pytest_asyncio.fixture
+async def test_engine():
+    """Fresh async engine per test — avoids asyncpg event loop conflicts."""
     engine = create_async_engine(TEST_DATABASE_URL)
     yield engine
     await engine.dispose()
