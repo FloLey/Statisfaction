@@ -45,6 +45,9 @@ jobs:
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS }}
         with:
           host: 100.109.197.38
           username: ${{ secrets.VPS_USER }}
