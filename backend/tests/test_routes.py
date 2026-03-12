@@ -8,39 +8,46 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 # Override DATABASE_URL before importing the app
 TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL",
-    "postgresql+asyncpg://todo:todo@localhost:5432/tododb_test",
+    "postgresql+asyncpg://statisfaction:statisfaction@localhost:5432/statisfactiondb_test",
 )
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 
 from app.database import Base, get_db  # noqa: E402
 from app.main import app  # noqa: E402
 
-test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-TestSessionLocal = async_sessionmaker(test_engine, expire_on_commit=False)
 
-
-async def override_get_db():
-    async with TestSessionLocal() as session:
-        yield session
-
-
-app.dependency_overrides[get_db] = override_get_db
+@pytest_asyncio.fixture(scope="session")
+async def db_engine():
+    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield engine
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    await engine.dispose()
 
 
 @pytest_asyncio.fixture(autouse=True)
-async def setup_db():
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+async def clean_tables(db_engine):
     yield
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+    async with db_engine.begin() as conn:
+        for table in reversed(Base.metadata.sorted_tables):
+            await conn.execute(table.delete())
 
 
 @pytest_asyncio.fixture
-async def client():
+async def client(db_engine):
+    session_factory = async_sessionmaker(db_engine, expire_on_commit=False)
+
+    async def override_get_db():
+        async with session_factory() as session:
+            yield session
+
+    app.dependency_overrides[get_db] = override_get_db
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
+    app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio
