@@ -17,7 +17,7 @@ services:
       - internal
 
   backend:
-    build: ./backend
+    image: ghcr.io/${OWNER_LC}/statisfaction-backend:latest
     restart: unless-stopped
     ports:
       - "${TAILSCALE_IP}:8001:8001"
@@ -31,10 +31,7 @@ services:
       - internal
 
   frontend:
-    build:
-      context: ./frontend
-      args:
-        VITE_API_URL: ${VITE_API_URL}
+    image: ghcr.io/${OWNER_LC}/statisfaction-frontend:latest
     restart: unless-stopped
     ports:
       - "${TAILSCALE_IP}:5174:5174"
