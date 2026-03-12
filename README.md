@@ -1,6 +1,6 @@
-# Statisfaction — Todo App
+# Statisfaction
 
-A minimal full-stack todo application accessible only via Tailscale.
+A minimal full-stack application accessible only via Tailscale.
 
 | Layer    | Stack                                          |
 |----------|------------------------------------------------|
@@ -41,9 +41,9 @@ Services bind to `127.0.0.1` only for local dev.
 | Method | Path               | Description           |
 |--------|--------------------|-----------------------|
 | GET    | /api/health        | Health check          |
-| GET    | /api/todos         | List all todos        |
-| POST   | /api/todos         | Create a todo         |
-| DELETE | /api/todos/{id}    | Delete a todo by id   |
+| GET    | /api/todos         | List all items        |
+| POST   | /api/todos         | Create an item        |
+| DELETE | /api/todos/{id}    | Delete an item by id  |
 
 **POST /api/todos** body: `{"title": "string"}`
 
@@ -58,7 +58,7 @@ Requires a running PostgreSQL instance (or use the dev compose DB):
 ```bash
 cd backend
 pip install -r requirements.txt
-TEST_DATABASE_URL=postgresql+asyncpg://todo:todo@localhost:5432/tododb_test pytest
+TEST_DATABASE_URL=postgresql+asyncpg://statisfaction:statisfaction@localhost:5432/statisfactiondb_test pytest
 ```
 
 ### Frontend
@@ -79,7 +79,7 @@ npm test
 │   ├── app/
 │   │   ├── main.py        # Routes + lifespan (runs migrations on startup)
 │   │   ├── database.py    # Async SQLAlchemy engine + session
-│   │   ├── models.py      # Todo ORM model
+│   │   ├── models.py      # ORM model
 │   │   └── schemas.py     # Pydantic schemas
 │   ├── alembic/           # Database migrations
 │   ├── tests/             # pytest tests (httpx AsyncClient)
