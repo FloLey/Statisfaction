@@ -1,8 +1,9 @@
 import os
+
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 # Override DATABASE_URL before importing the app
 TEST_DATABASE_URL = os.environ.get(
@@ -11,8 +12,8 @@ TEST_DATABASE_URL = os.environ.get(
 )
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 
-from app.main import app  # noqa: E402
 from app.database import Base, get_db  # noqa: E402
+from app.main import app  # noqa: E402
 
 test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 TestSessionLocal = async_sessionmaker(test_engine, expire_on_commit=False)

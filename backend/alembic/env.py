@@ -11,6 +11,7 @@ if config.config_file_name is not None:
 
 # Import models so metadata is populated
 from app.models import Base  # noqa: E402
+
 target_metadata = Base.metadata
 
 DATABASE_URL = os.environ["DATABASE_URL"]

@@ -2,10 +2,10 @@ import os
 import subprocess
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from .database import get_db
 from .models import Todo
