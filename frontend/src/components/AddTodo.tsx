@@ -16,16 +16,16 @@ export default function AddTodo({ onAdd }: Props) {
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
+    <form onSubmit={handleSubmit} className="add-todo-form">
       <input
         type="text"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        placeholder="New todo..."
+        placeholder="Add a new todo..."
         aria-label="New todo title"
-        style={{ flex: 1, padding: "0.5rem" }}
+        className="add-todo-input"
       />
-      <button type="submit" style={{ padding: "0.5rem 1rem" }}>
+      <button type="submit" className="btn-add">
         Add
       </button>
     </form>

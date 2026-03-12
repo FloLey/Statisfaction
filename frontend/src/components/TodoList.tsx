@@ -7,27 +7,23 @@ interface Props {
 
 export default function TodoList({ todos, onDelete }: Props) {
   if (todos.length === 0) {
-    return <p>No todos yet. Add one above!</p>;
+    return (
+      <div className="empty-state">
+        <div className="empty-state-icon">✓</div>
+        <p>No todos yet. Add one above!</p>
+      </div>
+    );
   }
 
   return (
-    <ul style={{ listStyle: "none", padding: 0 }}>
+    <ul className="todo-list">
       {todos.map((todo) => (
-        <li
-          key={todo.id}
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: "0.5rem 0",
-            borderBottom: "1px solid #eee",
-          }}
-        >
-          <span>{todo.title}</span>
+        <li key={todo.id} className="todo-item">
+          <span className="todo-title">{todo.title}</span>
           <button
             onClick={() => onDelete(todo.id)}
             aria-label={`Delete ${todo.title}`}
-            style={{ padding: "0.25rem 0.75rem", cursor: "pointer" }}
+            className="btn-delete"
           >
             Delete
           </button>
