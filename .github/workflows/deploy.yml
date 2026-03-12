@@ -1,0 +1,71 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Set lowercase owner
+        run: echo "OWNER_LC=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_ENV
+
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push backend
+        uses: docker/build-push-action@v7
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ghcr.io/${{ env.OWNER_LC }}/statisfaction-backend:latest
+            ghcr.io/${{ env.OWNER_LC }}/statisfaction-backend:${{ github.sha }}
+
+      - name: Build & push frontend
+        uses: docker/build-push-action@v7
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ghcr.io/${{ env.OWNER_LC }}/statisfaction-frontend:latest
+            ghcr.io/${{ env.OWNER_LC }}/statisfaction-frontend:${{ github.sha }}
+          build-args: |
+            VITE_API_URL=${{ secrets.VITE_API_URL }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    steps:
+      - name: Join Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
+      - name: Deploy on VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 100.109.197.38
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          script: |
+            cd /opt/statisfaction
+            git fetch origin main
+            git reset --hard origin/main
+            docker compose pull
+            docker compose up -d --remove-orphans
+            docker image prune -f
