@@ -61,4 +61,8 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 22
           script: |
-            /opt/statisfaction/scripts/deploy_prod.sh
+            cd /opt/statisfaction
+            git pull
+            docker compose pull
+            docker compose up -d --remove-orphans
+            docker image prune -f
