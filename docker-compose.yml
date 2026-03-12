@@ -21,7 +21,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db/${POSTGRES_DB}
     ports:
-      - "100.109.197.38:8001:8000"
+      - "8001:8000"
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
     depends_on:
       db:
         condition: service_healthy
@@ -31,7 +32,7 @@ services:
   frontend:
     image: ghcr.io/floley/statisfaction-frontend:latest
     ports:
-      - "100.109.197.38:5174:80"
+      - "5174:80"
     networks:
       - internal
 

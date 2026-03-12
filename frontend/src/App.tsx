@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getTodos, createTodo, deleteTodo, type Todo } from "./api";
 import AddTodo from "./components/AddTodo";
 import TodoList from "./components/TodoList";
+import "./App.css";
 
 export default function App() {
   const [todos, setTodos] = useState<Todo[]>([]);
@@ -10,14 +11,18 @@ export default function App() {
   useEffect(() => {
     getTodos()
       .then(setTodos)
-      .catch(() => setError("Failed to load todos"));
+      .catch((err) => {
+        console.error("Failed to load todos:", err);
+        setError("Failed to load todos");
+      });
   }, []);
 
   async function handleAdd(title: string) {
     try {
       const todo = await createTodo(title);
       setTodos((prev) => [todo, ...prev]);
-    } catch {
+    } catch (err) {
+      console.error("Failed to add todo:", err);
       setError("Failed to add todo");
     }
   }
@@ -26,15 +31,16 @@ export default function App() {
     try {
       await deleteTodo(id);
       setTodos((prev) => prev.filter((t) => t.id !== id));
-    } catch {
+    } catch (err) {
+      console.error("Failed to delete todo:", err);
       setError("Failed to delete todo");
     }
   }
 
   return (
-    <div style={{ maxWidth: 600, margin: "2rem auto", padding: "0 1rem" }}>
+    <div className="app">
       <h1>Todo List</h1>
-      {error && <p style={{ color: "red" }}>{error}</p>}
+      {error && <p className="app-error">{error}</p>}
       <AddTodo onAdd={handleAdd} />
       <TodoList todos={todos} onDelete={handleDelete} />
     </div>

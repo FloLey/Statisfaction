@@ -1,5 +1,6 @@
 import { type Todo } from "../api";
 import TodoItem from "./TodoItem";
+import "./TodoList.css";
 
 interface Props {
   todos: Todo[];
@@ -12,7 +13,7 @@ export default function TodoList({ todos, onDelete }: Props) {
   }
 
   return (
-    <ul style={{ listStyle: "none", padding: 0 }}>
+    <ul className="todo-list">
       {todos.map((todo) => (
         <TodoItem key={todo.id} todo={todo} onDelete={onDelete} />
       ))}

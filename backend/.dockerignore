@@ -1,0 +1,8 @@
+tests/
+pytest.ini
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.coverage
+htmlcov/

@@ -1,7 +1,3 @@
-import subprocess
-from contextlib import asynccontextmanager
-from pathlib import Path
-
 from fastapi import Depends, FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
@@ -11,20 +7,8 @@ from .database import get_db
 from .models import Todo
 from .schemas import TodoCreate, TodoOut
 
-BACKEND_DIR = Path(__file__).resolve().parent.parent
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    subprocess.run(
-        ["alembic", "upgrade", "head"],
-        check=True,
-        cwd=BACKEND_DIR,
-    )
-    yield
-
-
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,

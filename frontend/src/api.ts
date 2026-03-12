@@ -1,4 +1,4 @@
-const BASE_URL = "http://100.109.197.38:8001/api";
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 export interface Todo {
   id: number;
