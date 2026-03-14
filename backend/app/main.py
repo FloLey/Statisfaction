@@ -20,7 +20,7 @@ def run_migrations() -> None:
 
 
 def run_seeds() -> None:
-    subprocess.run(["python", "scripts/seed_ideas.py"], check=True)
+    subprocess.run(["python", "scripts/seed_ideas.py", "--reseed"], check=True)
 
 
 @asynccontextmanager
