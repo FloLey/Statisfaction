@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { IdeaDetail, IdeaSummary } from "../api";
 import { getIdea, getIdeas } from "../api";
+import AboutIdeas from "./AboutIdeas";
 import IdeaReader from "./IdeaReader";
 
 export default function IdeasSection() {
   const [ideas, setIdeas] = useState<IdeaSummary[]>([]);
   const [selected, setSelected] = useState<IdeaDetail | null>(null);
+  const [showAbout, setShowAbout] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +48,12 @@ export default function IdeasSection() {
     );
   }
 
+  if (showAbout) {
+    return (
+      <AboutIdeas onBack={() => { setShowAbout(false); window.scrollTo(0, 0); }} />
+    );
+  }
+
   return (
     <div className="ideas-section">
       <header className="ideas-header">
@@ -54,6 +62,9 @@ export default function IdeasSection() {
         <p className="ideas-subtitle">
           Des séries de schémas, animations et widgets pour explorer des idées.
         </p>
+        <button className="about-link" onClick={() => setShowAbout(true)}>
+          Comment ces idées sont faites →
+        </button>
       </header>
 
       {error && <div className="error-banner">{error}</div>}
