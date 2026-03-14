@@ -247,7 +247,8 @@ async def seed(db: AsyncSession) -> None:
     await db.flush()  # Get idea.id
 
     widget_order = 0
-    for section_data in SECTIONS:
+    for raw in SECTIONS:
+        section_data = dict(raw)  # copy — SECTIONS is a module-level constant
         widget_type = section_data.pop("widget_type")
         title = section_data.pop("title", None)
 

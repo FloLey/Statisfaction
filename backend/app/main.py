@@ -19,9 +19,14 @@ def run_migrations() -> None:
     subprocess.run(["alembic", "upgrade", "head"], check=True)
 
 
+def run_seeds() -> None:
+    subprocess.run(["python", "scripts/seed_ideas.py"], check=True)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     run_migrations()
+    run_seeds()
     yield
 
 
