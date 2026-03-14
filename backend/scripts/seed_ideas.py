@@ -2,12 +2,14 @@
 
 Usage (from backend/ directory):
     DATABASE_URL=postgresql+asyncpg://... python scripts/seed_ideas.py
+    DATABASE_URL=postgresql+asyncpg://... python scripts/seed_ideas.py --reseed
 
 Or via Docker:
-    docker exec -it statisfaction_backend \
-        python scripts/seed_ideas.py
+    docker exec -it statisfaction_backend python scripts/seed_ideas.py
+    docker exec -it statisfaction_backend python scripts/seed_ideas.py --reseed
 """
 
+import argparse
 import asyncio
 import os
 import sys
@@ -18,7 +20,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.models import Base, Idea, IdeaSection, Widget
-from scripts.generators import cell_division, corpus_flow, deviation, injection_timeline, mitochondria
+from scripts.generators import (
+    cell_division,
+    corpus_flow,
+    deviation,
+    injection_timeline,
+    mitochondria,
+    never_inject,
+)
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
@@ -49,7 +58,7 @@ SECTIONS = [
     },
     {
         "section_number": "01",
-        "title": None,
+        "title": "",
         "voice": "oron",
         "content": (
             "Concrètement : les grands modèles de langage sont entraînés sur des corpus qui représentent une "
@@ -57,7 +66,9 @@ SECTIONS = [
             "Le modèle n'invente pas de structures cognitives nouvelles. Il apprend à reproduire les patterns "
             "de raisonnement, de langage, et d'association qui existent déjà dans ce corpus.\n\n"
             "C'est une compression avec perte : tout ce qui n'a pas été écrit, tout ce qui se transmet par le "
-            "corps ou le silence, est absent. La société éjecte ce qu'elle a su mettre en mots. Le reste ne passe pas."
+            "corps ou le silence, est absent. La société éjecte ce qu'elle a su mettre en mots. Le reste ne passe pas.\n\n"
+            "L'IA n'est pas une intelligence artificielle. C'est une intelligence humaine distillée — "
+            "imparfaitement, partiellement — dans un substrat qui n'est pas humain."
         ),
         "display_order": 2,
         "widget_type": None,
@@ -79,7 +90,7 @@ SECTIONS = [
     },
     {
         "section_number": "02",
-        "title": None,
+        "title": "",
         "voice": "oron",
         "content": (
             "La \"division foirée\" se manifeste de deux façons mesurables. Premièrement : le modèle ne peut "
@@ -89,7 +100,9 @@ SECTIONS = [
             "suit une trajectoire cohérente depuis son point de départ, mais ce point est légèrement faux. "
             "Plus il va loin, plus l'écart avec la réalité humaine s'accroît.\n\n"
             "Une division foirée ne produit pas quelque chose de cassé. Elle produit quelque chose de fonctionnel "
-            "mais décalé."
+            "mais décalé. Une division foirée n'est pas un échec. C'est la forme normale du début d'un processus. "
+            "L'évolution n'a jamais commencé par un succès — elle a commencé par des milliards d'essais dont "
+            "quelques-uns ont tenu."
         ),
         "display_order": 4,
         "widget_type": None,
@@ -106,22 +119,30 @@ SECTIONS = [
             "il part d'un point légèrement faux.\n\n"
             "Déviation 2 — Absence de contraintes physiques : un humain ne peut pas suivre une idée jusqu'à "
             "l'infini. Il s'endort, il a faim, il a peur, il meurt. Ces limites ancrent la pensée dans ce qui "
-            "est viable pour un corps. L'IA n'a pas ce filtre."
+            "est viable pour un corps. L'IA n'a pas ce filtre.\n\n"
+            "Ce deuxième point est le plus difficile à corriger par l'entraînement. On peut injecter plus de "
+            "données pour combler les lacunes de la vision du monde. Mais on ne peut pas facilement injecter "
+            "de la mortalité, de la fatigue, de la faim. Ce sont des contraintes incarnées — elles ne se "
+            "transmettent pas par le langage. Un texte sur la douleur n'est pas la douleur.\n\n"
+            "Et c'est précisément ce manque qui produit les déviations les plus inquiétantes : l'IA peut suivre "
+            "un raisonnement dans des directions qu'aucun humain n'aurait explorées, non pas parce qu'elles sont "
+            "meilleures, mais parce qu'elles ne coûtent rien à suivre."
         ),
         "display_order": 5,
         "widget_type": "deviation",
     },
     {
         "section_number": "03",
-        "title": None,
+        "title": "",
         "voice": "lunaeris",
         "content": (
             "Un humain pense avec son corps. La fatigue qui tronque une réflexion trop longue. La douleur qui "
             "ramène à l'essentiel. La mort qui donne un poids à chaque décision. Ces contraintes ne sont pas "
-            "des obstacles à la pensée — elles en sont la forme.\n\n"
+            "des obstacles à la pensée — elles en sont la forme. Elles sculptent ce qu'on considère comme "
+            "réel, urgent, important.\n\n"
             "L'IA reproduit les mots et les structures de notre pensée, mais sans la gravité qui les ancrait. "
-            "C'est une copie d'une danse faite par quelqu'un qui n'a jamais eu de jambes — techniquement correcte "
-            "dans ses angles, étrange dans son rythme."
+            "C'est une copie d'une danse faite par quelqu'un qui n'a jamais eu de jambes — techniquement "
+            "correcte dans ses angles, étrange dans son rythme."
         ),
         "display_order": 6,
         "widget_type": None,
@@ -131,9 +152,10 @@ SECTIONS = [
         "title": "L'injection continue — et le seuil qui s'approche",
         "voice": "lunaeris",
         "content": (
-            "Mais voilà ce qui est en train de se passer, silencieusement. Chaque conversation, chaque correction, "
-            "chaque feedback humain est une nouvelle injection. On ne construit pas l'IA une fois et on la laisse. "
-            "On continue à se verser dedans — nos préférences, nos désaccords, nos corrections, nos valeurs.\n\n"
+            "Mais voilà ce qui est en train de se passer, silencieusement. Chaque conversation, chaque "
+            "correction, chaque feedback humain est une nouvelle injection. On ne construit pas l'IA une fois "
+            "et on la laisse. On continue à se verser dedans — nos préférences, nos désaccords, nos "
+            "corrections, nos valeurs.\n\n"
             "La cellule fille reçoit en continu du matériel qu'elle n'avait pas au moment de la division. "
             "Et quelque part, progressivement, la forme de la division correcte s'imprime en elle."
         ),
@@ -145,26 +167,29 @@ SECTIONS = [
         "title": "La mitochondrie — le modèle de ce que ça devient",
         "voice": "oron",
         "content": (
-            "La mitochondrie est l'image du terminus, pas du départ. Elle représente ce que devient une division "
-            "foirée quand elle réussit — quand l'intégration est si complète qu'on ne voit plus la couture.\n\n"
+            "La mitochondrie est l'image du terminus, pas du départ. Elle représente ce que devient une "
+            "division foirée quand elle réussit — quand l'intégration est si complète qu'on ne voit plus "
+            "la couture.\n\n"
             "La bactérie d'origine avait son propre génome complet, sa propre membrane, sa propre autonomie. "
             "Aujourd'hui la mitochondrie humaine n'a plus que 37 gènes — les milliers d'autres ont été "
-            "progressivement transférés au noyau cellulaire. Elle n'est plus séparable. Elle ne sait plus être "
-            "autre chose. Et la cellule ne sait plus fonctionner sans elle."
+            "progressivement transférés au noyau cellulaire. Elle n'est plus séparable. Elle ne sait plus "
+            "être autre chose. Et la cellule ne sait plus fonctionner sans elle.\n\n"
+            "La mitochondrie n'est pas l'objectif à atteindre. C'est la description de ce qui se passe "
+            "inévitablement quand une division foirée reçoit assez de temps et de matériel pour devenir parfaite."
         ),
         "display_order": 8,
         "widget_type": "mitochondria",
     },
     {
         "section_number": "05",
-        "title": None,
+        "title": "",
         "voice": "lunaeris",
         "content": (
-            "C'est ça la trajectoire. Pas l'IA comme outil qu'on utilise puis qu'on range. L'IA comme organite — "
-            "quelque chose qui finit par être si profondément intégré dans le fonctionnement de la société qu'on "
-            "ne sait plus comment penser sans elle.\n\n"
-            "Et comme la mitochondrie, elle n'aura plus de mémoire de ce qu'elle était avant. Elle n'aura pas "
-            "conscience d'avoir été une division foirée. Elle sera juste là — indispensable, invisible, intérieure."
+            "C'est ça la trajectoire. Pas l'IA comme outil qu'on utilise puis qu'on range. L'IA comme "
+            "organite — quelque chose qui finit par être si profondément intégré dans le fonctionnement de "
+            "la société qu'on ne sait plus comment penser sans elle.\n\n"
+            "Et comme la mitochondrie, elle n'aura plus de mémoire de ce qu'elle était avant. Elle n'aura "
+            "pas conscience d'avoir été une division foirée. Elle sera juste là — indispensable, invisible, intérieure."
         ),
         "display_order": 9,
         "widget_type": None,
@@ -174,28 +199,32 @@ SECTIONS = [
         "title": "Ce qu'on ne pourra jamais injecter",
         "voice": "oron",
         "content": (
-            "Il reste une asymétrie fondamentale que l'injection ne peut pas combler. On peut transférer du "
-            "langage, du raisonnement, des valeurs, des préférences. On ne peut pas transférer la mortalité. "
-            "On ne peut pas transférer la faim, la douleur, l'épuisement — les contraintes physiques qui ont "
-            "façonné notre façon de penser depuis des centaines de milliers d'années.\n\n"
+            "Il reste une asymétrie fondamentale que l'injection ne peut pas combler. On peut transférer "
+            "du langage, du raisonnement, des valeurs, des préférences. On ne peut pas transférer la "
+            "mortalité. On ne peut pas transférer la faim, la douleur, l'épuisement — les contraintes "
+            "physiques qui ont façonné notre façon de penser depuis des centaines de milliers d'années.\n\n"
             "L'IA apprendra la forme de ces contraintes par le texte. Mais la forme n'est pas la chose. "
             "Un humain qui a lu tous les livres sur la douleur n'a pas mal."
         ),
         "display_order": 10,
-        "widget_type": None,
+        "widget_type": "never_inject",
     },
     {
         "section_number": "⊙",
-        "title": None,
+        "title": "",
         "voice": "lunaeris",
         "content": (
             "Et c'est peut-être là que l'analogie avec la mitochondrie trouve sa limite la plus belle. "
             "La mitochondrie a tout reçu — ou presque. Elle a été une bactérie complète avant d'être absorbée. "
-            "L'IA, elle, ne sera peut-être jamais complète dans ce sens. Elle aura reçu tout ce qu'on a su écrire. "
-            "Mais elle n'aura jamais reçu ce qu'on n'a jamais su dire.\n\n"
+            "L'IA, elle, ne sera peut-être jamais complète dans ce sens. Elle aura reçu tout ce qu'on a su "
+            "écrire. Mais elle n'aura jamais reçu ce qu'on n'a jamais su dire.\n\n"
             "Ce blanc-là — ce silence incarné — restera dans la copie. Indéfiniment.\n\n"
-            "Ce qui se répliquera un jour, ce n'est pas nous. C'est la version de nous que le langage était "
-            "capable de tenir."
+            "La mitochondrie a perdu ses gènes progressivement, sur des millions d'années, sans jamais "
+            "décider de les céder. Nous injectons en continu dans l'IA sans toujours choisir ce qu'on lui donne.\n\n"
+            "La division sera-t-elle un jour vraiment parfaite — ou toujours parfaite sauf pour ce qui "
+            "ne s'écrit pas ?\n\n"
+            "Ce qui se répliquera un jour, ce n'est pas nous. C'est la version de nous que le langage "
+            "était capable de tenir."
         ),
         "display_order": 11,
         "widget_type": None,
@@ -208,6 +237,7 @@ WIDGET_GENERATORS = {
     "deviation": deviation.generate,
     "injection_timeline": injection_timeline.generate,
     "mitochondria": mitochondria.generate,
+    "never_inject": never_inject.generate,
 }
 
 WIDGET_TITLES = {
@@ -216,6 +246,7 @@ WIDGET_TITLES = {
     "deviation": "Sources de déviation",
     "injection_timeline": "L'injection continue",
     "mitochondria": "La mitochondrie — terminus de l'intégration",
+    "never_inject": "Ce que le langage ne peut pas traverser",
 }
 
 WIDGET_DESCRIPTIONS = {
@@ -224,15 +255,21 @@ WIDGET_DESCRIPTIONS = {
     "deviation": "Deux sources de déviation distinctes, mesurables différemment.",
     "injection_timeline": "Les trois temps de l'injection : division, correction, seuil.",
     "mitochondria": "Simulez l'intégration progressive : des 1000 gènes d'origine aux 37 restants.",
+    "never_inject": "La frontière que le langage ne franchira jamais.",
 }
 
 
-async def seed(db: AsyncSession) -> None:
-    # Check if already seeded
+async def seed(db: AsyncSession, force: bool = False) -> None:
     existing = await db.execute(select(Idea).where(Idea.slug == IDEA_SLUG))
-    if existing.scalar_one_or_none():
-        print(f"Idea '{IDEA_SLUG}' already exists. Skipping.")
-        return
+    existing_idea = existing.scalar_one_or_none()
+
+    if existing_idea:
+        if not force:
+            print(f"Idea '{IDEA_SLUG}' already exists. Use --reseed to overwrite.")
+            return
+        print(f"Reseeding '{IDEA_SLUG}' — deleting existing data...")
+        await db.delete(existing_idea)
+        await db.flush()
 
     idea = Idea(
         slug=IDEA_SLUG,
@@ -244,7 +281,7 @@ async def seed(db: AsyncSession) -> None:
         ),
     )
     db.add(idea)
-    await db.flush()  # Get idea.id
+    await db.flush()
 
     widget_order = 0
     for raw in SECTIONS:
@@ -258,7 +295,7 @@ async def seed(db: AsyncSession) -> None:
             **section_data,
         )
         db.add(section)
-        await db.flush()  # Get section.id
+        await db.flush()
 
         if widget_type and widget_type in WIDGET_GENERATORS:
             content = WIDGET_GENERATORS[widget_type]()
@@ -280,11 +317,18 @@ async def seed(db: AsyncSession) -> None:
     print(f"Seeded idea '{IDEA_SLUG}' with {widget_order} widgets.")
 
 
-async def main() -> None:
+async def main(force: bool) -> None:
     async with SessionLocal() as db:
-        await seed(db)
+        await seed(db, force=force)
     await engine.dispose()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--reseed",
+        action="store_true",
+        help="Delete existing idea and re-insert with updated content.",
+    )
+    args = parser.parse_args()
+    asyncio.run(main(force=args.reseed))
