@@ -2,9 +2,13 @@ import { useState, useEffect, useCallback } from "react";
 import { getTodos, createTodo, deleteTodo, Todo } from "./api";
 import AddTodo from "./components/AddTodo";
 import TodoList from "./components/TodoList";
+import IdeasSection from "./components/IdeasSection";
 import "./App.css";
 
+type View = "home" | "ideas";
+
 export default function App() {
+  const [view, setView] = useState<View>("home");
   const [todos, setTodos] = useState<Todo[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -17,8 +21,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    fetchTodos();
-  }, [fetchTodos]);
+    if (view === "home") fetchTodos();
+  }, [fetchTodos, view]);
 
   const handleAdd = async (title: string) => {
     try {
@@ -39,10 +43,42 @@ export default function App() {
     }
   };
 
+  if (view === "ideas") {
+    return (
+      <div className="app app--ideas">
+        <nav className="app-nav">
+          <button className="nav-brand" onClick={() => setView("home")}>
+            Statisfaction
+          </button>
+          <div className="nav-links">
+            <button className="nav-link" onClick={() => setView("home")}>
+              Accueil
+            </button>
+            <button className="nav-link nav-link--active" onClick={() => setView("ideas")}>
+              Idées
+            </button>
+          </div>
+        </nav>
+        <IdeasSection />
+      </div>
+    );
+  }
+
   return (
     <div className="app">
+      <nav className="app-nav">
+        <span className="nav-brand">Statisfaction</span>
+        <div className="nav-links">
+          <button className="nav-link nav-link--active" onClick={() => setView("home")}>
+            Accueil
+          </button>
+          <button className="nav-link" onClick={() => setView("ideas")}>
+            Idées
+          </button>
+        </div>
+      </nav>
+
       <header className="app-header">
-        <h1>Statisfaction</h1>
         <p>Keep track of what needs doing</p>
       </header>
 

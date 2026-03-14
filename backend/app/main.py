@@ -8,8 +8,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .database import get_db
-from .models import Todo
-from .schemas import TodoCreate, TodoRead
+from .models import Idea, IdeaSection, Todo, Widget
+from .schemas import IdeaDetailRead, IdeaRead, TodoCreate, TodoRead
 
 _cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5174")
 CORS_ORIGINS = [o.strip() for o in _cors_origins.split(",")]
@@ -63,3 +63,27 @@ async def delete_todo(todo_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Todo not found")
     await db.delete(todo)
     await db.commit()
+
+
+@app.get("/api/ideas", response_model=list[IdeaRead])
+async def list_ideas(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Idea).order_by(Idea.created_at.desc()))
+    return result.scalars().all()
+
+
+@app.get("/api/ideas/{slug}", response_model=IdeaDetailRead)
+async def get_idea(slug: str, db: AsyncSession = Depends(get_db)):
+    from sqlalchemy.orm import selectinload
+
+    result = await db.execute(
+        select(Idea)
+        .where(Idea.slug == slug)
+        .options(
+            selectinload(Idea.sections).selectinload(IdeaSection.widgets),
+            selectinload(Idea.widgets),
+        )
+    )
+    idea = result.scalar_one_or_none()
+    if idea is None:
+        raise HTTPException(status_code=404, detail="Idea not found")
+    return idea

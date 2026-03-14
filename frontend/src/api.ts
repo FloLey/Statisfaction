@@ -26,3 +26,49 @@ export async function deleteTodo(id: number): Promise<void> {
   const res = await fetch(`${BASE_URL}/api/todos/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error("Failed to delete todo");
 }
+
+export interface IdeaWidget {
+  id: number;
+  title: string | null;
+  description: string | null;
+  widget_type: string;
+  content: string | null;
+  mime_type: string | null;
+  metadata_json: Record<string, unknown> | null;
+  display_order: number;
+}
+
+export interface IdeaSection {
+  id: number;
+  section_number: string | null;
+  title: string;
+  voice: string | null;
+  content: string;
+  display_order: number;
+  widgets: IdeaWidget[];
+}
+
+export interface IdeaSummary {
+  id: number;
+  slug: string;
+  title: string;
+  summary: string | null;
+  created_at: string;
+}
+
+export interface IdeaDetail extends IdeaSummary {
+  sections: IdeaSection[];
+  widgets: IdeaWidget[];
+}
+
+export async function getIdeas(): Promise<IdeaSummary[]> {
+  const res = await fetch(`${BASE_URL}/api/ideas`);
+  if (!res.ok) throw new Error("Failed to fetch ideas");
+  return res.json();
+}
+
+export async function getIdea(slug: string): Promise<IdeaDetail> {
+  const res = await fetch(`${BASE_URL}/api/ideas/${slug}`);
+  if (!res.ok) throw new Error("Failed to fetch idea");
+  return res.json();
+}
