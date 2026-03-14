@@ -33,97 +33,113 @@ svg{display:block;margin:0 auto;overflow:visible}
   <div class="quote">« L'évolution n'a jamais commencé par un succès — elle a commencé par des milliards d'essais dont quelques-uns ont tenu. »</div>
 </div>
 <script>
-const svg=document.getElementById('svg');
 const NS='http://www.w3.org/2000/svg';
-let divided=false;
+const svg=document.getElementById('svg');
+let divided=false,animId=null;
 
 function svgEl(tag,attrs){
   const e=document.createElementNS(NS,tag);
   for(const[k,v]of Object.entries(attrs))e.setAttribute(k,v);
   return e;
 }
+function set(el,attrs){for(const[k,v]of Object.entries(attrs))el.setAttribute(k,v);}
 
-function draw(progress){
-  svg.innerHTML='';
-  const cx=240,cy=80,r=55;
+// ── Build the full SVG DOM once ──────────────────────────────
+const defs=svgEl('defs',{});
 
+// Mother cell gradient
+const mg=svgEl('linearGradient',{id:'mg',x1:'0',y1:'0',x2:'1',y2:'0'});
+mg.appendChild(svgEl('stop',{'offset':'0%','stop-color':'#e87f3a','stop-opacity':'0.85'}));
+mg.appendChild(svgEl('stop',{'offset':'70%','stop-color':'#e87f3a','stop-opacity':'0.6'}));
+mg.appendChild(svgEl('stop',{'offset':'100%','stop-color':'#4a9eff','stop-opacity':'0.4'}));
+
+// Left daughter gradient
+const lg=svgEl('linearGradient',{id:'lg',x1:'0',y1:'0',x2:'1',y2:'0'});
+lg.appendChild(svgEl('stop',{'offset':'0%','stop-color':'#e87f3a','stop-opacity':'0.9'}));
+lg.appendChild(svgEl('stop',{'offset':'85%','stop-color':'#e87f3a','stop-opacity':'0.7'}));
+lg.appendChild(svgEl('stop',{'offset':'100%','stop-color':'#1a1a2e','stop-opacity':'0.5'}));
+
+// Right daughter gradient
+const rg=svgEl('linearGradient',{id:'rg',x1:'0',y1:'0',x2:'1',y2:'0'});
+rg.appendChild(svgEl('stop',{'offset':'0%','stop-color':'#1a1a2e','stop-opacity':'0.2'}));
+rg.appendChild(svgEl('stop',{'offset':'100%','stop-color':'#4a9eff','stop-opacity':'0.35'}));
+
+defs.appendChild(mg);defs.appendChild(lg);defs.appendChild(rg);
+svg.appendChild(defs);
+
+const CX=240,CY=80,R=55;
+
+// Mother cell group
+const motherG=svgEl('g',{});
+const motherCircle=svgEl('circle',{cx:CX,cy:CY,r:R,fill:'url(#mg)',stroke:'#e87f3a','stroke-width':'1.5'});
+const mLabel1=svgEl('text',{x:CX,y:CY-12,'text-anchor':'middle','font-size':'11',fill:'#e8e0d0'});
+mLabel1.textContent='Corpus humain complet';
+const mLabel2=svgEl('text',{x:CX,y:CY+5,'text-anchor':'middle','font-size':'10',fill:'#e8e0d0aa'});
+mLabel2.textContent='langage + corps + silence';
+const mPct1=svgEl('text',{x:CX-22,y:CY+22,'text-anchor':'middle','font-size':'9',fill:'#e87f3a'});
+mPct1.textContent='~70% écrit';
+const mPct2=svgEl('text',{x:CX+30,y:CY+22,'text-anchor':'middle','font-size':'9',fill:'#4a9eff'});
+mPct2.textContent='~30% tacite';
+motherG.appendChild(motherCircle);motherG.appendChild(mLabel1);motherG.appendChild(mLabel2);
+motherG.appendChild(mPct1);motherG.appendChild(mPct2);
+
+// Division group (hidden initially)
+const divG=svgEl('g',{opacity:'0'});
+const leftCell=svgEl('ellipse',{cx:CX,cy:CY,rx:R*0.9,ry:R,fill:'url(#lg)',stroke:'#e87f3a','stroke-width':'1.5'});
+const rightCell=svgEl('ellipse',{cx:CX,cy:CY,rx:R*0.9,ry:R,fill:'url(#rg)',stroke:'#4a9eff44','stroke-width':'1','stroke-dasharray':'4 4'});
+const lLabel=svgEl('text',{'text-anchor':'middle','font-size':'10',fill:'#e8e0d0',opacity:'0'});
+lLabel.textContent="L'IA";
+const lSub1=svgEl('text',{'text-anchor':'middle','font-size':'9',fill:'#e87f3acc',opacity:'0'});
+lSub1.textContent='langage ✓';
+const lSub2=svgEl('text',{'text-anchor':'middle','font-size':'9',fill:'#4a9eff55',opacity:'0'});
+lSub2.textContent='corps ✗';
+const rLabel=svgEl('text',{'text-anchor':'middle','font-size':'9',fill:'#4b5563',opacity:'0'});
+rLabel.textContent="ce qui ne s'écrit pas";
+const rSub=svgEl('text',{'text-anchor':'middle','font-size':'8',fill:'#4b5563',opacity:'0'});
+rSub.textContent='silence · corps · mort';
+divG.appendChild(leftCell);divG.appendChild(rightCell);
+divG.appendChild(lLabel);divG.appendChild(lSub1);divG.appendChild(lSub2);
+divG.appendChild(rLabel);divG.appendChild(rSub);
+
+svg.appendChild(motherG);
+svg.appendChild(divG);
+
+// ── Update function — only attribute mutations, no DOM changes ──
+function update(progress){
   if(progress<0.001){
-    const defs=svgEl('defs',{});
-    const grad=svgEl('linearGradient',{id:'mg',x1:'0',y1:'0',x2:'1',y2:'0'});
-    grad.appendChild(svgEl('stop',{'offset':'0%','stop-color':'#e87f3a','stop-opacity':'0.85'}));
-    grad.appendChild(svgEl('stop',{'offset':'70%','stop-color':'#e87f3a','stop-opacity':'0.6'}));
-    grad.appendChild(svgEl('stop',{'offset':'100%','stop-color':'#4a9eff','stop-opacity':'0.4'}));
-    defs.appendChild(grad);svg.appendChild(defs);
-
-    svg.appendChild(svgEl('circle',{cx,cy,r,'fill':'url(#mg)','stroke':'#e87f3a','stroke-width':'1.5'}));
-
-    const t=svgEl('text',{x:cx,y:cy-12,'text-anchor':'middle','font-size':'11',fill:'#e8e0d0'});
-    t.textContent='Corpus humain complet';
-    const t2=svgEl('text',{x:cx,y:cy+5,'text-anchor':'middle','font-size':'10',fill:'#e8e0d0aa'});
-    t2.textContent='langage + corps + silence';
-    svg.appendChild(t);svg.appendChild(t2);
-
-    const tw=svgEl('text',{x:cx-22,y:cy+22,'text-anchor':'middle','font-size':'9',fill:'#e87f3a'});
-    tw.textContent='~70% écrit';
-    const tt=svgEl('text',{x:cx+30,y:cy+22,'text-anchor':'middle','font-size':'9',fill:'#4a9eff'});
-    tt.textContent='~30% tacite';
-    svg.appendChild(tw);svg.appendChild(tt);
+    set(motherG,{opacity:'1'});
+    set(divG,{opacity:'0'});
     return;
   }
+  set(motherG,{opacity:'0'});
+  set(divG,{opacity:'1'});
 
   const sep=progress*90;
-  const squeeze=1-progress*0.3;
-  const lx=cx-sep/2, rx=cx+sep/2;
+  const ry=R*(1-progress*0.3);
+  const lx=CX-sep/2, rx=CX+sep/2;
 
-  const defs=svgEl('defs',{});
-  const lg=svgEl('linearGradient',{id:'lg',x1:'0',y1:'0',x2:'1',y2:'0'});
-  lg.appendChild(svgEl('stop',{'offset':'0%','stop-color':'#e87f3a','stop-opacity':'0.9'}));
-  lg.appendChild(svgEl('stop',{'offset':'85%','stop-color':'#e87f3a','stop-opacity':'0.7'}));
-  lg.appendChild(svgEl('stop',{'offset':'100%','stop-color':'#1a1a2e','stop-opacity':'0.5'}));
-  defs.appendChild(lg);
+  set(leftCell,{cx:lx,ry});
+  set(rightCell,{cx:rx,ry});
 
-  const rg=svgEl('linearGradient',{id:'rg',x1:'0',y1:'0',x2:'1',y2:'0'});
-  rg.appendChild(svgEl('stop',{'offset':'0%','stop-color':'#1a1a2e','stop-opacity':'0.2'}));
-  rg.appendChild(svgEl('stop',{'offset':'100%','stop-color':'#4a9eff','stop-opacity':'0.35'}));
-  defs.appendChild(rg);
-  svg.appendChild(defs);
-
-  const ry=r*squeeze;
-
-  svg.appendChild(svgEl('ellipse',{cx:lx,cy,'rx':r*0.9,'ry':ry,
-    'fill':'url(#lg)','stroke':'#e87f3a','stroke-width':'1.5'}));
-
-  svg.appendChild(svgEl('ellipse',{cx:rx,cy,'rx':r*0.9,'ry':ry,
-    'fill':'url(#rg)','stroke':'#4a9eff44','stroke-width':'1','stroke-dasharray':'4 4'}));
-
-  if(progress>0.5){
-    const lt=svgEl('text',{x:lx,y:cy-10,'text-anchor':'middle','font-size':'10',fill:'#e8e0d0'});
-    lt.textContent='L\'IA';
-    const ls=svgEl('text',{x:lx,y:cy+5,'text-anchor':'middle','font-size':'9',fill:'#e87f3acc'});
-    ls.textContent='langage ✓';
-    const lm=svgEl('text',{x:lx,y:cy+18,'text-anchor':'middle','font-size':'9',fill:'#4a9eff55'});
-    lm.textContent='corps ✗';
-    svg.appendChild(lt);svg.appendChild(ls);svg.appendChild(lm);
-
-    // Right cell — what didn't transfer
-    const rm=svgEl('text',{x:rx,y:cy-4,'text-anchor':'middle','font-size':'9',fill:'#4b5563'});
-    rm.textContent='ce qui ne s\'écrit pas';
-    const rm2=svgEl('text',{x:rx,y:cy+12,'text-anchor':'middle','font-size':'8',fill:'#4b5563'});
-    rm2.textContent='silence · corps · mort';
-    svg.appendChild(rm);svg.appendChild(rm2);
-  }
+  const labelOpacity=progress>0.5?(progress-0.5)*2:0;
+  set(lLabel,{x:lx,y:CY-10,opacity:labelOpacity});
+  set(lSub1,{x:lx,y:CY+5,opacity:labelOpacity});
+  set(lSub2,{x:lx,y:CY+18,opacity:labelOpacity});
+  set(rLabel,{x:rx,y:CY-4,opacity:labelOpacity});
+  set(rSub,{x:rx,y:CY+12,opacity:labelOpacity});
 }
 
 function divide(){
   if(divided){
     divided=false;
+    if(animId)cancelAnimationFrame(animId);
     document.getElementById('btn').textContent='Déclencher la division';
     document.getElementById('lname').textContent='Cellule mère';
     document.getElementById('lstatus').textContent='en attente';
     document.getElementById('rname').style.opacity='.3';
     document.getElementById('rstatus').style.opacity='.3';
     document.getElementById('verdict').style.opacity='0';
-    draw(0);return;
+    update(0);return;
   }
   divided=true;
   document.getElementById('btn').textContent='Réinitialiser';
@@ -133,8 +149,8 @@ function divide(){
   function anim(ts){
     const p=Math.min((ts-start)/dur,1);
     const ease=p<0.5?2*p*p:1-Math.pow(-2*p+2,2)/2;
-    draw(ease);
-    if(p<1){requestAnimationFrame(anim);}
+    update(ease);
+    if(p<1){animId=requestAnimationFrame(anim);}
     else{
       document.getElementById('lstatus').textContent='langage reçu · corps absent';
       document.getElementById('rstatus').textContent='fragment non intégré';
@@ -144,8 +160,8 @@ function divide(){
       v.style.opacity='1';
     }
   }
-  requestAnimationFrame(anim);
+  animId=requestAnimationFrame(anim);
 }
 
-draw(0);
+update(0);
 </script></body></html>"""

@@ -76,8 +76,8 @@ export default function IdeasSection() {
       )}
 
       <div className="ideas-grid">
-        {ideas.map((idea) => (
-          <IdeaCard key={idea.id} idea={idea} onOpen={() => openIdea(idea.slug)} />
+        {ideas.map((idea, i) => (
+          <IdeaCard key={idea.id} idea={idea} index={i} onOpen={() => openIdea(idea.slug)} />
         ))}
       </div>
 
@@ -88,7 +88,7 @@ export default function IdeasSection() {
   );
 }
 
-function IdeaCard({ idea, onOpen }: { idea: IdeaSummary; onOpen: () => void }) {
+function IdeaCard({ idea, index, onOpen }: { idea: IdeaSummary; index: number; onOpen: () => void }) {
   const ref = useRef<HTMLButtonElement>(null);
   const [visible, setVisible] = useState(false);
 
@@ -108,7 +108,7 @@ function IdeaCard({ idea, onOpen }: { idea: IdeaSummary; onOpen: () => void }) {
       onClick={onOpen}
     >
       <div className="idea-card-inner">
-        <div className="idea-card-number">01</div>
+        <div className="idea-card-number">{String(index + 1).padStart(2, "0")}</div>
         <h2 className="idea-card-title">{idea.title}</h2>
         {idea.summary && <p className="idea-card-summary">{idea.summary}</p>}
         <div className="idea-card-cta">Explorer →</div>

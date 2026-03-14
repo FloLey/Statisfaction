@@ -7,6 +7,30 @@ import "./App.css";
 
 type View = "home" | "ideas";
 
+function Nav({ view, onNav }: { view: View; onNav: (v: View) => void }) {
+  return (
+    <nav className="app-nav">
+      <button className="nav-brand" onClick={() => onNav("home")}>
+        Statisfaction
+      </button>
+      <div className="nav-links">
+        <button
+          className={`nav-link ${view === "home" ? "nav-link--active" : ""}`}
+          onClick={() => onNav("home")}
+        >
+          Accueil
+        </button>
+        <button
+          className={`nav-link ${view === "ideas" ? "nav-link--active" : ""}`}
+          onClick={() => onNav("ideas")}
+        >
+          Idées
+        </button>
+      </div>
+    </nav>
+  );
+}
+
 export default function App() {
   const [view, setView] = useState<View>("home");
   const [todos, setTodos] = useState<Todo[]>([]);
@@ -43,22 +67,15 @@ export default function App() {
     }
   };
 
+  function handleNav(v: View) {
+    setView(v);
+    window.scrollTo(0, 0);
+  }
+
   if (view === "ideas") {
     return (
       <div className="app app--ideas">
-        <nav className="app-nav">
-          <button className="nav-brand" onClick={() => setView("home")}>
-            Statisfaction
-          </button>
-          <div className="nav-links">
-            <button className="nav-link" onClick={() => setView("home")}>
-              Accueil
-            </button>
-            <button className="nav-link nav-link--active" onClick={() => setView("ideas")}>
-              Idées
-            </button>
-          </div>
-        </nav>
+        <Nav view={view} onNav={handleNav} />
         <IdeasSection />
       </div>
     );
@@ -66,17 +83,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <nav className="app-nav">
-        <span className="nav-brand">Statisfaction</span>
-        <div className="nav-links">
-          <button className="nav-link nav-link--active" onClick={() => setView("home")}>
-            Accueil
-          </button>
-          <button className="nav-link" onClick={() => setView("ideas")}>
-            Idées
-          </button>
-        </div>
-      </nav>
+      <Nav view={view} onNav={handleNav} />
 
       <header className="app-header">
         <p>Keep track of what needs doing</p>

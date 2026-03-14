@@ -6,6 +6,7 @@ from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from .database import get_db
 from .models import Idea, IdeaSection, Todo, Widget
@@ -19,14 +20,9 @@ def run_migrations() -> None:
     subprocess.run(["alembic", "upgrade", "head"], check=True)
 
 
-def run_seeds() -> None:
-    subprocess.run(["python", "scripts/seed_ideas.py", "--reseed"], check=True)
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     run_migrations()
-    run_seeds()
     yield
 
 
@@ -78,8 +74,6 @@ async def list_ideas(db: AsyncSession = Depends(get_db)):
 
 @app.get("/api/ideas/{slug}", response_model=IdeaDetailRead)
 async def get_idea(slug: str, db: AsyncSession = Depends(get_db)):
-    from sqlalchemy.orm import selectinload
-
     result = await db.execute(
         select(Idea)
         .where(Idea.slug == slug)

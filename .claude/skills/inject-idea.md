@@ -121,7 +121,12 @@ async def seed(db: AsyncSession) -> None:
     await db.commit()
     print("Seeded.")
 
-asyncio.run(seed.__wrapped__(Session()))
+async def main():
+    async with Session() as db:
+        await seed(db)
+    await engine.dispose()
+
+asyncio.run(main())
 ```
 
 ## Running the seed

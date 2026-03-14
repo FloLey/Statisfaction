@@ -5,11 +5,21 @@ interface Props {
   widget: IdeaWidget;
 }
 
+const RESIZE_SCRIPT = `<script>
+  function reportSize(){
+    const h=document.body.scrollHeight||document.documentElement.scrollHeight;
+    parent.postMessage({type:'resize',height:h},'*');
+  }
+  window.addEventListener('load',reportSize);
+  window.addEventListener('resize',reportSize);
+  new ResizeObserver(reportSize).observe(document.body);
+<\/script>`;
+
 export default function WidgetRenderer({ widget }: Props) {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [height, setHeight] = useState(280);
   const containerRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
+  const [height, setHeight] = useState(280);
+  const [iframeUrl, setIframeUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const obs = new IntersectionObserver(
@@ -20,7 +30,19 @@ export default function WidgetRenderer({ widget }: Props) {
     return () => obs.disconnect();
   }, []);
 
-  // Resize iframe to content height via postMessage
+  // Create and revoke blob URL to prevent memory leak
+  useEffect(() => {
+    if (widget.widget_type !== "html" || !widget.content || !visible) return;
+    const src = widget.content.replace("</body>", `${RESIZE_SCRIPT}</body>`);
+    const blob = new Blob([src], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    setIframeUrl(url);
+    return () => {
+      URL.revokeObjectURL(url);
+      setIframeUrl(null);
+    };
+  }, [widget.content, widget.widget_type, visible]);
+
   useEffect(() => {
     function onMessage(e: MessageEvent) {
       if (e.data?.type === "resize" && typeof e.data.height === "number") {
@@ -33,31 +55,16 @@ export default function WidgetRenderer({ widget }: Props) {
 
   const type = widget.widget_type;
 
-  if (type === "html" && widget.content) {
-    // Inject a resize reporter into the HTML
-    const resizeScript = `<script>
-      function reportSize(){
-        const h=document.body.scrollHeight||document.documentElement.scrollHeight;
-        parent.postMessage({type:'resize',height:h},'*');
-      }
-      window.addEventListener('load',reportSize);
-      window.addEventListener('resize',reportSize);
-      new ResizeObserver(reportSize).observe(document.body);
-    <\/script>`;
-    const src = widget.content.replace("</body>", `${resizeScript}</body>`);
-    const blob = new Blob([src], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-
+  if (type === "html") {
     return (
       <div ref={containerRef} className="widget-container">
         {widget.title && <div className="widget-title">{widget.title}</div>}
         {widget.description && (
           <div className="widget-description">{widget.description}</div>
         )}
-        {visible && (
+        {iframeUrl && (
           <iframe
-            ref={iframeRef}
-            src={url}
+            src={iframeUrl}
             sandbox="allow-scripts"
             style={{ width: "100%", height, border: "none", borderRadius: 6 }}
             title={widget.title ?? "Widget"}

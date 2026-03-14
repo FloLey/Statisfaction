@@ -69,4 +69,15 @@ jobs:
             git reset --hard origin/main
             docker compose pull
             docker compose up -d --remove-orphans
+            echo "Waiting for backend to be healthy..."
+            for i in $(seq 1 20); do
+              if docker compose exec -T backend python -c \
+                "import urllib.request; urllib.request.urlopen('http://localhost:8001/api/health')" \
+                2>/dev/null; then
+                echo "Backend ready."
+                break
+              fi
+              sleep 3
+            done
+            docker compose exec -T backend python scripts/seed_ideas.py --reseed
             docker image prune -f

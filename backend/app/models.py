@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy import ForeignKey, Integer, LargeBinary, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -68,8 +69,10 @@ class Widget(Base):
     )
     title: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    # widget_type: 'html' | 'animated_svg' | 'chart_svg' | 'video'
-    widget_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    widget_type: Mapped[str] = mapped_column(
+        SAEnum("html", "animated_svg", "chart_svg", "video", name="widget_type_enum"),
+        nullable=False,
+    )
     content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     content_binary: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
     mime_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
