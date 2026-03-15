@@ -48,4 +48,14 @@ describe("App", () => {
       expect(screen.queryByText("Buy milk")).not.toBeInTheDocument();
     });
   });
+
+  it("opens and closes documentation modal", async () => {
+    render(<App />);
+    await waitFor(() => screen.getByText("Buy milk"));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /open documentation/i }));
+    expect(screen.getByRole("dialog", { name: /documentation/i })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /close documentation/i }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
 });
