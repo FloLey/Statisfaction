@@ -2,11 +2,13 @@ import { useState, useEffect, useCallback } from "react";
 import { getTodos, createTodo, deleteTodo, Todo } from "./api";
 import AddTodo from "./components/AddTodo";
 import TodoList from "./components/TodoList";
+import DocsModal from "./components/DocsModal";
 import "./App.css";
 
 export default function App() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [docsOpen, setDocsOpen] = useState(false);
 
   const fetchTodos = useCallback(async () => {
     try {
@@ -44,7 +46,16 @@ export default function App() {
       <header className="app-header">
         <h1>Statisfaction</h1>
         <p>Keep track of what needs doing</p>
+        <button
+          className="btn-docs"
+          onClick={() => setDocsOpen(true)}
+          aria-label="Open documentation"
+        >
+          Docs
+        </button>
       </header>
+
+      <DocsModal open={docsOpen} onClose={() => setDocsOpen(false)} />
 
       {error && (
         <div className="error-banner" role="alert">

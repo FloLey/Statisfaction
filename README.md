@@ -71,6 +71,12 @@ npm test
 
 ---
 
+## In-App Documentation
+
+Click the **Docs** button in the top-right corner of the header to open a documentation modal with usage instructions, API reference, and tech stack details.
+
+---
+
 ## Project Structure
 
 ```
