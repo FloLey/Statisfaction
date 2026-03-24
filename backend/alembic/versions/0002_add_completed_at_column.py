@@ -33,4 +33,12 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_column("todos", "completed_at")
+    conn = op.get_bind()
+    result = conn.execute(
+        sa.text(
+            "SELECT 1 FROM information_schema.columns "
+            "WHERE table_name = 'todos' AND column_name = 'completed_at'"
+        )
+    )
+    if result.fetchone() is not None:
+        op.drop_column("todos", "completed_at")
