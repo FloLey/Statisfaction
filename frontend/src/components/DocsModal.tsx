@@ -37,7 +37,9 @@ export default function DocsModal({ open, onClose }: DocsModalProps) {
             <p>
               Statisfaction is a simple todo tracker. Add tasks using the input
               field at the top of the card and press <strong>Add</strong>. Click{" "}
-              <strong>Delete</strong> next to a task to remove it.
+              <strong>Done</strong> to mark a task as complete, or{" "}
+              <strong>Delete</strong> to remove it. Use the tabs to switch
+              between active tasks, completed tasks, and daily stats.
             </p>
           </section>
 
@@ -68,9 +70,19 @@ export default function DocsModal({ open, onClose }: DocsModalProps) {
                   <td>Create an item</td>
                 </tr>
                 <tr>
+                  <td><code>PATCH</code></td>
+                  <td><code>/api/todos/&#123;id&#125;/complete</code></td>
+                  <td>Toggle task completion</td>
+                </tr>
+                <tr>
                   <td><code>DELETE</code></td>
                   <td><code>/api/todos/&#123;id&#125;</code></td>
                   <td>Delete an item by id</td>
+                </tr>
+                <tr>
+                  <td><code>GET</code></td>
+                  <td><code>/api/todos/stats/daily</code></td>
+                  <td>Daily creation &amp; completion counts</td>
                 </tr>
               </tbody>
             </table>
