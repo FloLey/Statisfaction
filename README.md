@@ -34,6 +34,8 @@ docker compose -f docker-compose.dev.yml up --build
 
 Services bind to `127.0.0.1` only for local dev.
 
+The Vite dev server proxies `/api` requests to `http://localhost:8001`, so no CORS configuration is needed during development. For production, set the `VITE_API_URL` build arg or rely on the nginx reverse proxy.
+
 ---
 
 ## Features
