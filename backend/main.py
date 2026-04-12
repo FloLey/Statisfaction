@@ -47,9 +47,7 @@ def health():
 @app.get("/api/users", response_model=list[UserRead])
 def list_users(conn=Depends(get_db)):
     cur = conn.cursor()
-    cur.execute(
-        "SELECT id, name, email, created_at FROM users ORDER BY name"
-    )
+    cur.execute("SELECT id, name, email, created_at FROM users ORDER BY name")
     return cur.fetchall()
 
 
@@ -85,9 +83,7 @@ def sync_activities(
     try:
         client = garmin_mod.login(user["email"], body.password)
     except Exception as exc:
-        raise HTTPException(
-            401, detail=f"Garmin login failed: {exc}"
-        )
+        raise HTTPException(401, detail=f"Garmin login failed: {exc}")
 
     cur.execute(
         "SELECT MAX(date) as latest FROM activities WHERE user_id = %s",
@@ -134,9 +130,7 @@ def sync_activities(
         activity_id = cur.fetchone()["id"]
 
         try:
-            splits = garmin_mod.fetch_splits(
-                client, normalized["garmin_id"]
-            )
+            splits = garmin_mod.fetch_splits(client, normalized["garmin_id"])
             for s in splits:
                 cur.execute(
                     """INSERT INTO splits
@@ -192,15 +186,12 @@ def list_activities(user_id: int, conn=Depends(get_db)):
 )
 def get_activity(activity_id: int, conn=Depends(get_db)):
     cur = conn.cursor()
-    cur.execute(
-        "SELECT * FROM activities WHERE id = %s", (activity_id,)
-    )
+    cur.execute("SELECT * FROM activities WHERE id = %s", (activity_id,))
     activity = cur.fetchone()
     if not activity:
         raise HTTPException(404, detail="Activity not found")
     cur.execute(
-        "SELECT * FROM splits WHERE activity_id = %s"
-        " ORDER BY split_number",
+        "SELECT * FROM splits WHERE activity_id = %s" " ORDER BY split_number",
         (activity_id,),
     )
     result = dict(activity)
