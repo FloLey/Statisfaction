@@ -44,7 +44,7 @@ jobs:
             ghcr.io/${{ env.OWNER_LC }}/statisfaction-frontend:latest
             ghcr.io/${{ env.OWNER_LC }}/statisfaction-frontend:${{ github.sha }}
           build-args: |
-            VITE_API_URL=${{ secrets.VITE_API_URL }}
+            VITE_API_URL=
 
   deploy:
     runs-on: ubuntu-latest

@@ -23,8 +23,8 @@ services:
     ports:
       - "${TAILSCALE_IP}:7745:7745"
     environment:
-      DATABASE_URL: ${DATABASE_URL}
-      CORS_ORIGINS: ${CORS_ORIGINS}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://statisfaction:statisfaction@db:5490/statisfactiondb}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://100.109.197.38:7746}
     depends_on:
       db:
         condition: service_healthy
