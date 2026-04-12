@@ -68,22 +68,14 @@ def test_create_user(client):
 
 
 def test_create_duplicate_user(client):
-    client.post(
-        "/api/users", json={"name": "Bob", "email": "bob@garmin.com"}
-    )
-    resp = client.post(
-        "/api/users", json={"name": "Bob", "email": "bob2@garmin.com"}
-    )
+    client.post("/api/users", json={"name": "Bob", "email": "bob@garmin.com"})
+    resp = client.post("/api/users", json={"name": "Bob", "email": "bob2@garmin.com"})
     assert resp.status_code == 409
 
 
 def test_list_users(client):
-    client.post(
-        "/api/users", json={"name": "Alice", "email": "a@g.com"}
-    )
-    client.post(
-        "/api/users", json={"name": "Bob", "email": "b@g.com"}
-    )
+    client.post("/api/users", json={"name": "Alice", "email": "a@g.com"})
+    client.post("/api/users", json={"name": "Bob", "email": "b@g.com"})
     resp = client.get("/api/users")
     assert resp.status_code == 200
     assert len(resp.json()) == 2
@@ -93,9 +85,7 @@ def test_list_users(client):
 
 
 def test_list_activities_empty(client):
-    resp = client.post(
-        "/api/users", json={"name": "Alice", "email": "a@g.com"}
-    )
+    resp = client.post("/api/users", json={"name": "Alice", "email": "a@g.com"})
     user_id = resp.json()["id"]
     resp = client.get(f"/api/users/{user_id}/activities")
     assert resp.status_code == 200
@@ -108,9 +98,7 @@ def test_list_activities_user_not_found(client):
 
 
 def test_list_activities(client):
-    resp = client.post(
-        "/api/users", json={"name": "Alice", "email": "a@g.com"}
-    )
+    resp = client.post("/api/users", json={"name": "Alice", "email": "a@g.com"})
     user_id = resp.json()["id"]
 
     import db as db_mod
@@ -122,16 +110,36 @@ def test_list_activities(client):
            (user_id, garmin_id, name, date, distance_km, duration_min,
             avg_hr, max_hr, avg_pace_min_km, elevation_gain_m)
            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-        (user_id, "111", "Morning Run", "2026-03-15 08:00:00",
-         10.0, 50.0, 155, 175, 5.0, 30.0),
+        (
+            user_id,
+            "111",
+            "Morning Run",
+            "2026-03-15 08:00:00",
+            10.0,
+            50.0,
+            155,
+            175,
+            5.0,
+            30.0,
+        ),
     )
     cur.execute(
         """INSERT INTO activities
            (user_id, garmin_id, name, date, distance_km, duration_min,
             avg_hr, max_hr, avg_pace_min_km, elevation_gain_m)
            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-        (user_id, "222", "Evening Run", "2026-03-16 18:00:00",
-         5.0, 25.0, 145, 165, 5.0, 10.0),
+        (
+            user_id,
+            "222",
+            "Evening Run",
+            "2026-03-16 18:00:00",
+            5.0,
+            25.0,
+            145,
+            165,
+            5.0,
+            10.0,
+        ),
     )
     conn.commit()
     conn.close()
@@ -144,9 +152,7 @@ def test_list_activities(client):
 
 
 def test_get_activity_with_splits(client):
-    resp = client.post(
-        "/api/users", json={"name": "Alice", "email": "a@g.com"}
-    )
+    resp = client.post("/api/users", json={"name": "Alice", "email": "a@g.com"})
     user_id = resp.json()["id"]
 
     import db as db_mod
@@ -159,8 +165,18 @@ def test_get_activity_with_splits(client):
             avg_hr, max_hr, avg_pace_min_km, elevation_gain_m)
            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
            RETURNING id""",
-        (user_id, "111", "Morning Run", "2026-03-15 08:00:00",
-         10.0, 50.0, 155, 175, 5.0, 30.0),
+        (
+            user_id,
+            "111",
+            "Morning Run",
+            "2026-03-15 08:00:00",
+            10.0,
+            50.0,
+            155,
+            175,
+            5.0,
+            30.0,
+        ),
     )
     activity_id = cur.fetchone()["id"]
     cur.execute(
@@ -214,9 +230,7 @@ FAKE_ACTIVITIES = [
 
 @patch("main.garmin_mod")
 def test_sync_success(mock_garmin, client):
-    resp = client.post(
-        "/api/users", json={"name": "Alice", "email": "a@g.com"}
-    )
+    resp = client.post("/api/users", json={"name": "Alice", "email": "a@g.com"})
     user_id = resp.json()["id"]
 
     mock_client = MagicMock()
@@ -244,9 +258,7 @@ def test_sync_success(mock_garmin, client):
         }
     ]
 
-    resp = client.post(
-        f"/api/users/{user_id}/sync", json={"password": "secret"}
-    )
+    resp = client.post(f"/api/users/{user_id}/sync", json={"password": "secret"})
     assert resp.status_code == 200
     data = resp.json()
     assert data["synced"] == 1
@@ -258,24 +270,18 @@ def test_sync_success(mock_garmin, client):
 
 @patch("main.garmin_mod")
 def test_sync_bad_credentials(mock_garmin, client):
-    resp = client.post(
-        "/api/users", json={"name": "Alice", "email": "a@g.com"}
-    )
+    resp = client.post("/api/users", json={"name": "Alice", "email": "a@g.com"})
     user_id = resp.json()["id"]
 
     mock_garmin.login.side_effect = Exception("Invalid credentials")
 
-    resp = client.post(
-        f"/api/users/{user_id}/sync", json={"password": "wrong"}
-    )
+    resp = client.post(f"/api/users/{user_id}/sync", json={"password": "wrong"})
     assert resp.status_code == 401
 
 
 @patch("main.garmin_mod")
 def test_sync_idempotent(mock_garmin, client):
-    resp = client.post(
-        "/api/users", json={"name": "Alice", "email": "a@g.com"}
-    )
+    resp = client.post("/api/users", json={"name": "Alice", "email": "a@g.com"})
     user_id = resp.json()["id"]
 
     mock_client = MagicMock()
@@ -294,20 +300,14 @@ def test_sync_idempotent(mock_garmin, client):
     }
     mock_garmin.fetch_splits.return_value = []
 
-    resp = client.post(
-        f"/api/users/{user_id}/sync", json={"password": "secret"}
-    )
+    resp = client.post(f"/api/users/{user_id}/sync", json={"password": "secret"})
     assert resp.json()["synced"] == 1
 
-    resp = client.post(
-        f"/api/users/{user_id}/sync", json={"password": "secret"}
-    )
+    resp = client.post(f"/api/users/{user_id}/sync", json={"password": "secret"})
     assert resp.json()["synced"] == 0
     assert resp.json()["total"] == 1
 
 
 def test_sync_user_not_found(client):
-    resp = client.post(
-        "/api/users/999/sync", json={"password": "secret"}
-    )
+    resp = client.post("/api/users/999/sync", json={"password": "secret"})
     assert resp.status_code == 404
