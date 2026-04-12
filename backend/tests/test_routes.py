@@ -1,179 +1,313 @@
 import os
-from datetime import datetime, timedelta, timezone
+import sys
+from unittest.mock import MagicMock, patch
 
+import psycopg2
 import pytest
-import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from fastapi.testclient import TestClient
 
-# Override DATABASE_URL before importing the app
-TEST_DATABASE_URL = os.environ.get(
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
-    "postgresql+asyncpg://statisfaction:statisfaction@localhost:5432/statisfactiondb_test",
+    "postgresql://statisfaction:statisfaction@localhost:5490/statisfactiondb",
 )
-os.environ["DATABASE_URL"] = TEST_DATABASE_URL
-
-from app.database import Base, get_db  # noqa: E402
-from app.main import app  # noqa: E402
-from app.models import Todo  # noqa: E402
 
 
-@pytest_asyncio.fixture(scope="session")
-async def db_engine():
-    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield engine
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-    await engine.dispose()
+@pytest.fixture(autouse=True)
+def _fresh_db():
+    os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 
+    import db as db_mod
 
-@pytest_asyncio.fixture(autouse=True)
-async def clean_tables(db_engine):
+    db_mod.DATABASE_URL = TEST_DATABASE_URL
+    db_mod.init_db(TEST_DATABASE_URL)
+
     yield
-    async with db_engine.begin() as conn:
-        for table in reversed(Base.metadata.sorted_tables):
-            await conn.execute(table.delete())
+
+    conn = psycopg2.connect(TEST_DATABASE_URL)
+    conn.autocommit = True
+    cur = conn.cursor()
+    cur.execute("DROP TABLE IF EXISTS splits CASCADE")
+    cur.execute("DROP TABLE IF EXISTS activities CASCADE")
+    cur.execute("DROP TABLE IF EXISTS users CASCADE")
+    conn.close()
 
 
-@pytest_asyncio.fixture
-async def db_session(db_engine):
-    session_factory = async_sessionmaker(db_engine, expire_on_commit=False)
-    async with session_factory() as session:
-        yield session
+@pytest.fixture()
+def client():
+    from main import app
+
+    with TestClient(app) as c:
+        yield c
 
 
-@pytest_asyncio.fixture
-async def client(db_engine):
-    session_factory = async_sessionmaker(db_engine, expire_on_commit=False)
-
-    async def override_get_db():
-        async with session_factory() as session:
-            yield session
-
-    app.dependency_overrides[get_db] = override_get_db
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
-    app.dependency_overrides.clear()
+# -- Health --
 
 
-@pytest.mark.asyncio
-async def test_health(client: AsyncClient):
-    response = await client.get("/api/health")
-    assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+def test_health(client):
+    resp = client.get("/api/health")
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "ok"}
 
 
-@pytest.mark.asyncio
-async def test_create_todo(client: AsyncClient):
-    response = await client.post("/api/todos", json={"title": "Buy milk"})
-    assert response.status_code == 201
-    data = response.json()
-    assert data["title"] == "Buy milk"
+# -- Users --
+
+
+def test_create_user(client):
+    resp = client.post(
+        "/api/users",
+        json={"name": "Alice", "email": "alice@garmin.com"},
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["name"] == "Alice"
+    assert data["email"] == "alice@garmin.com"
     assert "id" in data
     assert "created_at" in data
-    assert data["completed_at"] is None
 
 
-@pytest.mark.asyncio
-async def test_list_todos(client: AsyncClient):
-    await client.post("/api/todos", json={"title": "Task 1"})
-    await client.post("/api/todos", json={"title": "Task 2"})
-    response = await client.get("/api/todos")
-    assert response.status_code == 200
-    todos = response.json()
-    assert len(todos) == 2
-    titles = {t["title"] for t in todos}
-    assert titles == {"Task 1", "Task 2"}
+def test_create_duplicate_user(client):
+    client.post(
+        "/api/users", json={"name": "Bob", "email": "bob@garmin.com"}
+    )
+    resp = client.post(
+        "/api/users", json={"name": "Bob", "email": "bob2@garmin.com"}
+    )
+    assert resp.status_code == 409
 
 
-@pytest.mark.asyncio
-async def test_delete_todo(client: AsyncClient):
-    create_resp = await client.post("/api/todos", json={"title": "To delete"})
-    todo_id = create_resp.json()["id"]
-
-    delete_resp = await client.delete(f"/api/todos/{todo_id}")
-    assert delete_resp.status_code == 204
-
-    list_resp = await client.get("/api/todos")
-    assert list_resp.json() == []
-
-
-@pytest.mark.asyncio
-async def test_delete_todo_not_found(client: AsyncClient):
-    response = await client.delete("/api/todos/99999")
-    assert response.status_code == 404
+def test_list_users(client):
+    client.post(
+        "/api/users", json={"name": "Alice", "email": "a@g.com"}
+    )
+    client.post(
+        "/api/users", json={"name": "Bob", "email": "b@g.com"}
+    )
+    resp = client.get("/api/users")
+    assert resp.status_code == 200
+    assert len(resp.json()) == 2
 
 
-@pytest.mark.asyncio
-async def test_complete_todo(client: AsyncClient):
-    create_resp = await client.post("/api/todos", json={"title": "To complete"})
-    todo_id = create_resp.json()["id"]
-
-    patch_resp = await client.patch(f"/api/todos/{todo_id}/complete")
-    assert patch_resp.status_code == 200
-    data = patch_resp.json()
-    assert data["completed_at"] is not None
-
-    # Verify it persists in the list
-    list_resp = await client.get("/api/todos")
-    todo = list_resp.json()[0]
-    assert todo["completed_at"] is not None
+# -- Activities --
 
 
-@pytest.mark.asyncio
-async def test_uncomplete_todo(client: AsyncClient):
-    create_resp = await client.post("/api/todos", json={"title": "Toggle me"})
-    todo_id = create_resp.json()["id"]
-
-    # Complete
-    await client.patch(f"/api/todos/{todo_id}/complete")
-    # Uncomplete
-    patch_resp = await client.patch(f"/api/todos/{todo_id}/complete")
-    assert patch_resp.status_code == 200
-    assert patch_resp.json()["completed_at"] is None
+def test_list_activities_empty(client):
+    resp = client.post(
+        "/api/users", json={"name": "Alice", "email": "a@g.com"}
+    )
+    user_id = resp.json()["id"]
+    resp = client.get(f"/api/users/{user_id}/activities")
+    assert resp.status_code == 200
+    assert resp.json() == []
 
 
-@pytest.mark.asyncio
-async def test_complete_todo_not_found(client: AsyncClient):
-    response = await client.patch("/api/todos/99999/complete")
-    assert response.status_code == 404
+def test_list_activities_user_not_found(client):
+    resp = client.get("/api/users/999/activities")
+    assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
-async def test_daily_stats_empty(client: AsyncClient):
-    response = await client.get("/api/todos/stats/daily")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["completed"] == []
-    assert data["created"] == []
+def test_list_activities(client):
+    resp = client.post(
+        "/api/users", json={"name": "Alice", "email": "a@g.com"}
+    )
+    user_id = resp.json()["id"]
+
+    import db as db_mod
+
+    conn = db_mod._connect()
+    cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO activities
+           (user_id, garmin_id, name, date, distance_km, duration_min,
+            avg_hr, max_hr, avg_pace_min_km, elevation_gain_m)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+        (user_id, "111", "Morning Run", "2026-03-15 08:00:00",
+         10.0, 50.0, 155, 175, 5.0, 30.0),
+    )
+    cur.execute(
+        """INSERT INTO activities
+           (user_id, garmin_id, name, date, distance_km, duration_min,
+            avg_hr, max_hr, avg_pace_min_km, elevation_gain_m)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+        (user_id, "222", "Evening Run", "2026-03-16 18:00:00",
+         5.0, 25.0, 145, 165, 5.0, 10.0),
+    )
+    conn.commit()
+    conn.close()
+
+    resp = client.get(f"/api/users/{user_id}/activities")
+    assert resp.status_code == 200
+    activities = resp.json()
+    assert len(activities) == 2
+    assert activities[0]["garmin_id"] == "222"
 
 
-@pytest.mark.asyncio
-async def test_daily_stats(client: AsyncClient, db_session):
-    today = datetime.now(timezone.utc)
-    yesterday = today - timedelta(days=1)
+def test_get_activity_with_splits(client):
+    resp = client.post(
+        "/api/users", json={"name": "Alice", "email": "a@g.com"}
+    )
+    user_id = resp.json()["id"]
 
-    # Insert todos with specific dates via the DB session
-    todo1 = Todo(title="T1", created_at=yesterday)
-    todo2 = Todo(title="T2", created_at=yesterday)
-    todo3 = Todo(title="T3", created_at=today, completed_at=today)
-    todo4 = Todo(title="T4", created_at=today, completed_at=yesterday)
-    db_session.add_all([todo1, todo2, todo3, todo4])
-    await db_session.commit()
+    import db as db_mod
 
-    response = await client.get("/api/todos/stats/daily")
-    assert response.status_code == 200
-    data = response.json()
+    conn = db_mod._connect()
+    cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO activities
+           (user_id, garmin_id, name, date, distance_km, duration_min,
+            avg_hr, max_hr, avg_pace_min_km, elevation_gain_m)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+           RETURNING id""",
+        (user_id, "111", "Morning Run", "2026-03-15 08:00:00",
+         10.0, 50.0, 155, 175, 5.0, 30.0),
+    )
+    activity_id = cur.fetchone()["id"]
+    cur.execute(
+        """INSERT INTO splits
+           (activity_id, split_number, distance_km,
+            duration_min, pace_min_km, avg_hr, elevation_gain_m)
+           VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+        (activity_id, 1, 1.0, 5.1, 5.1, 150, 3.0),
+    )
+    cur.execute(
+        """INSERT INTO splits
+           (activity_id, split_number, distance_km,
+            duration_min, pace_min_km, avg_hr, elevation_gain_m)
+           VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+        (activity_id, 2, 1.0, 4.9, 4.9, 155, 5.0),
+    )
+    conn.commit()
+    conn.close()
 
-    # Created: 2 yesterday, 2 today
-    created = {s["date"]: s["count"] for s in data["created"]}
-    assert created[str(yesterday.date())] == 2
-    assert created[str(today.date())] == 2
+    resp = client.get(f"/api/activities/{activity_id}")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["garmin_id"] == "111"
+    assert len(data["splits"]) == 2
+    assert data["splits"][0]["split_number"] == 1
 
-    # Completed: 1 yesterday, 1 today
-    completed = {s["date"]: s["count"] for s in data["completed"]}
-    assert completed[str(yesterday.date())] == 1
-    assert completed[str(today.date())] == 1
+
+def test_get_activity_not_found(client):
+    resp = client.get("/api/activities/999")
+    assert resp.status_code == 404
+
+
+# -- Sync --
+
+
+FAKE_ACTIVITIES = [
+    {
+        "activityId": 12345,
+        "activityName": "Morning Run",
+        "activityType": {"typeKey": "running"},
+        "startTimeLocal": "2026-03-15 08:00:00",
+        "distance": 10050.0,
+        "duration": 3120.0,
+        "averageHR": 155,
+        "maxHR": 175,
+        "averageSpeed": 3.22,
+        "elevationGain": 45.0,
+    }
+]
+
+
+@patch("main.garmin_mod")
+def test_sync_success(mock_garmin, client):
+    resp = client.post(
+        "/api/users", json={"name": "Alice", "email": "a@g.com"}
+    )
+    user_id = resp.json()["id"]
+
+    mock_client = MagicMock()
+    mock_garmin.login.return_value = mock_client
+    mock_garmin.fetch_activities.return_value = FAKE_ACTIVITIES
+    mock_garmin.normalize_activity.side_effect = lambda raw: {
+        "garmin_id": str(raw["activityId"]),
+        "name": raw["activityName"],
+        "date": raw["startTimeLocal"],
+        "distance_km": 10.05,
+        "duration_min": 52.0,
+        "avg_hr": 155,
+        "max_hr": 175,
+        "avg_pace_min_km": 5.18,
+        "elevation_gain_m": 45.0,
+    }
+    mock_garmin.fetch_splits.return_value = [
+        {
+            "split_number": 1,
+            "distance_km": 1.0,
+            "duration_min": 5.0,
+            "pace_min_km": 5.0,
+            "avg_hr": 150,
+            "elevation_gain_m": 5.0,
+        }
+    ]
+
+    resp = client.post(
+        f"/api/users/{user_id}/sync", json={"password": "secret"}
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["synced"] == 1
+    assert data["total"] == 1
+
+    resp = client.get(f"/api/users/{user_id}/activities")
+    assert len(resp.json()) == 1
+
+
+@patch("main.garmin_mod")
+def test_sync_bad_credentials(mock_garmin, client):
+    resp = client.post(
+        "/api/users", json={"name": "Alice", "email": "a@g.com"}
+    )
+    user_id = resp.json()["id"]
+
+    mock_garmin.login.side_effect = Exception("Invalid credentials")
+
+    resp = client.post(
+        f"/api/users/{user_id}/sync", json={"password": "wrong"}
+    )
+    assert resp.status_code == 401
+
+
+@patch("main.garmin_mod")
+def test_sync_idempotent(mock_garmin, client):
+    resp = client.post(
+        "/api/users", json={"name": "Alice", "email": "a@g.com"}
+    )
+    user_id = resp.json()["id"]
+
+    mock_client = MagicMock()
+    mock_garmin.login.return_value = mock_client
+    mock_garmin.fetch_activities.return_value = FAKE_ACTIVITIES
+    mock_garmin.normalize_activity.side_effect = lambda raw: {
+        "garmin_id": str(raw["activityId"]),
+        "name": raw["activityName"],
+        "date": raw["startTimeLocal"],
+        "distance_km": 10.05,
+        "duration_min": 52.0,
+        "avg_hr": 155,
+        "max_hr": 175,
+        "avg_pace_min_km": 5.18,
+        "elevation_gain_m": 45.0,
+    }
+    mock_garmin.fetch_splits.return_value = []
+
+    resp = client.post(
+        f"/api/users/{user_id}/sync", json={"password": "secret"}
+    )
+    assert resp.json()["synced"] == 1
+
+    resp = client.post(
+        f"/api/users/{user_id}/sync", json={"password": "secret"}
+    )
+    assert resp.json()["synced"] == 0
+    assert resp.json()["total"] == 1
+
+
+def test_sync_user_not_found(client):
+    resp = client.post(
+        "/api/users/999/sync", json={"password": "secret"}
+    )
+    assert resp.status_code == 404

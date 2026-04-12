@@ -1,53 +1,100 @@
-const BASE_URL = import.meta.env.VITE_API_URL ?? "";
+import axios from "axios";
 
-export interface Todo {
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL ?? "",
+});
+
+export interface User {
   id: number;
-  title: string;
+  name: string;
+  email: string;
   created_at: string;
-  completed_at: string | null;
 }
 
-export interface DailyStat {
+export interface Activity {
+  id: number;
+  garmin_id: string;
+  name: string;
   date: string;
-  count: number;
+  distance_km: number | null;
+  duration_min: number | null;
+  avg_hr: number | null;
+  max_hr: number | null;
+  avg_pace_min_km: number | null;
+  elevation_gain_m: number | null;
 }
 
-export interface DailyStatsResponse {
-  completed: DailyStat[];
-  created: DailyStat[];
+export interface Split {
+  split_number: number;
+  distance_km: number | null;
+  duration_min: number | null;
+  pace_min_km: number | null;
+  avg_hr: number | null;
+  elevation_gain_m: number | null;
 }
 
-export async function getTodos(): Promise<Todo[]> {
-  const res = await fetch(`${BASE_URL}/api/todos`);
-  if (!res.ok) throw new Error("Failed to fetch todos");
-  return res.json();
+export interface ActivityDetailResponse extends Activity {
+  splits: Split[];
 }
 
-export async function createTodo(title: string): Promise<Todo> {
-  const res = await fetch(`${BASE_URL}/api/todos`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title }),
-  });
-  if (!res.ok) throw new Error("Failed to create todo");
-  return res.json();
+export interface SplitWithActivity extends Split {
+  activity_id: number;
+  activity_name: string;
+  activity_date: string;
 }
 
-export async function deleteTodo(id: number): Promise<void> {
-  const res = await fetch(`${BASE_URL}/api/todos/${id}`, { method: "DELETE" });
-  if (!res.ok) throw new Error("Failed to delete todo");
+export interface SyncResult {
+  synced: number;
+  total: number;
 }
 
-export async function completeTodo(id: number): Promise<Todo> {
-  const res = await fetch(`${BASE_URL}/api/todos/${id}/complete`, {
-    method: "PATCH",
-  });
-  if (!res.ok) throw new Error("Failed to update todo");
-  return res.json();
+export async function getUsers(): Promise<User[]> {
+  const { data } = await api.get<User[]>("/api/users");
+  return data;
 }
 
-export async function getDailyStats(): Promise<DailyStatsResponse> {
-  const res = await fetch(`${BASE_URL}/api/todos/stats/daily`);
-  if (!res.ok) throw new Error("Failed to fetch stats");
-  return res.json();
+export async function createUser(
+  name: string,
+  email: string,
+): Promise<User> {
+  const { data } = await api.post<User>("/api/users", { name, email });
+  return data;
+}
+
+export async function syncUser(
+  userId: number,
+  password: string,
+): Promise<SyncResult> {
+  const { data } = await api.post<SyncResult>(
+    `/api/users/${userId}/sync`,
+    { password },
+  );
+  return data;
+}
+
+export async function getActivities(
+  userId: number,
+): Promise<Activity[]> {
+  const { data } = await api.get<Activity[]>(
+    `/api/users/${userId}/activities`,
+  );
+  return data;
+}
+
+export async function getUserSplits(
+  userId: number,
+): Promise<SplitWithActivity[]> {
+  const { data } = await api.get<SplitWithActivity[]>(
+    `/api/users/${userId}/splits`,
+  );
+  return data;
+}
+
+export async function getActivityDetail(
+  activityId: number,
+): Promise<ActivityDetailResponse> {
+  const { data } = await api.get<ActivityDetailResponse>(
+    `/api/activities/${activityId}`,
+  );
+  return data;
 }

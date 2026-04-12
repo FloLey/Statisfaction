@@ -9,7 +9,7 @@
 
 - Always add tests for new functionality and update existing tests when behavior changes.
 - Verify all tests pass before committing:
-  - **Backend:** `cd backend && TEST_DATABASE_URL=postgresql+asyncpg://statisfaction:statisfaction@localhost:5433/statisfactiondb_test pytest`
+  - **Backend:** `cd backend && TEST_DATABASE_URL=postgresql://statisfaction:statisfaction@localhost:5490/statisfactiondb pytest`
   - **Frontend:** `cd frontend && npm test`
 - Never commit code that breaks existing tests.
 
