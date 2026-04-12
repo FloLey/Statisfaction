@@ -82,8 +82,8 @@ def sync_activities(
 
     try:
         client = garmin_mod.login(user["email"], body.password)
-    except Exception as exc:
-        raise HTTPException(401, detail=f"Garmin login failed: {exc}")
+    except Exception:
+        raise HTTPException(401, detail="Garmin login failed")
 
     cur.execute(
         "SELECT MAX(date) as latest FROM activities WHERE user_id = %s",
@@ -186,12 +186,19 @@ def list_activities(user_id: int, conn=Depends(get_db)):
 )
 def get_activity(activity_id: int, conn=Depends(get_db)):
     cur = conn.cursor()
-    cur.execute("SELECT * FROM activities WHERE id = %s", (activity_id,))
+    cur.execute(
+        "SELECT id, garmin_id, name, date, distance_km, duration_min,"
+        " avg_hr, max_hr, avg_pace_min_km, elevation_gain_m"
+        " FROM activities WHERE id = %s",
+        (activity_id,),
+    )
     activity = cur.fetchone()
     if not activity:
         raise HTTPException(404, detail="Activity not found")
     cur.execute(
-        "SELECT * FROM splits WHERE activity_id = %s" " ORDER BY split_number",
+        "SELECT split_number, distance_km, duration_min, pace_min_km,"
+        " avg_hr, elevation_gain_m"
+        " FROM splits WHERE activity_id = %s ORDER BY split_number",
         (activity_id,),
     )
     result = dict(activity)
