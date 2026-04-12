@@ -16,6 +16,7 @@ import {
 } from "../components/charts/chartHelpers";
 import FilterBar from "../components/FilterBar";
 import ActivityRow from "../components/ActivityRow";
+import SplitRow from "../components/SplitRow";
 import ProgressCharts from "../components/charts/ProgressCharts";
 import SyncModal from "../components/SyncModal";
 
@@ -266,7 +267,7 @@ export default function Activities() {
         </div>
       )}
 
-      {cleanActivities.length > 0 && view === "table" && (
+      {cleanActivities.length > 0 && view === "table" && granularity === "runs" && (
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -284,6 +285,32 @@ export default function Activities() {
               <tbody>
                 {cleanActivities.map((a) => (
                   <ActivityRow key={a.id} activity={a} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {dataPoints.length > 0 && view === "table" && granularity === "splits" && (
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 bg-gray-50 text-[11px] uppercase tracking-wider text-gray-500">
+                  <th className="py-2.5 px-4 font-medium">Date</th>
+                  <th className="py-2.5 px-4 font-medium">Run</th>
+                  <th className="py-2.5 px-4 font-medium">Split</th>
+                  <th className="py-2.5 px-4 font-medium">Distance</th>
+                  <th className="py-2.5 px-4 font-medium">Duration</th>
+                  <th className="py-2.5 px-4 font-medium">Pace</th>
+                  <th className="py-2.5 px-4 font-medium">Avg HR</th>
+                  <th className="py-2.5 px-4 font-medium">Elev.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dataPoints.map((s) => (
+                  <SplitRow key={`${s.activity_id}-${s.split_number}`} split={s} />
                 ))}
               </tbody>
             </table>
