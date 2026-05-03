@@ -9,6 +9,7 @@ services:
       PGPORT: "5490"
     volumes:
       - pgdata_dev:/var/lib/postgresql/data
+      - ./scripts/init-test-db.sh:/docker-entrypoint-initdb.d/init-test-db.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U statisfaction -d statisfactiondb -p 5490"]
       interval: 5s
