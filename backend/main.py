@@ -12,6 +12,7 @@ from db import get_db, init_db
 from models import (
     ActivityDetail,
     ActivitySummary,
+    ReclassifyResponse,
     SplitWithActivity,
     SyncRequest,
     SyncResponse,
@@ -136,8 +137,8 @@ def sync_activities(
                     """INSERT INTO splits
                        (activity_id, split_number, distance_km,
                         duration_min, pace_min_km, avg_hr,
-                        elevation_gain_m)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+                        elevation_gain_m, split_type)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
                     (
                         activity_id,
                         s["split_number"],
@@ -146,6 +147,7 @@ def sync_activities(
                         s["pace_min_km"],
                         s["avg_hr"],
                         s["elevation_gain_m"],
+                        s["split_type"],
                     ),
                 )
         except Exception:
@@ -197,13 +199,40 @@ def get_activity(activity_id: int, conn=Depends(get_db)):
         raise HTTPException(404, detail="Activity not found")
     cur.execute(
         "SELECT split_number, distance_km, duration_min, pace_min_km,"
-        " avg_hr, elevation_gain_m"
+        " avg_hr, elevation_gain_m, split_type"
         " FROM splits WHERE activity_id = %s ORDER BY split_number",
         (activity_id,),
     )
     result = dict(activity)
     result["splits"] = cur.fetchall()
     return result
+
+
+@app.post(
+    "/api/users/{user_id}/reclassify",
+    response_model=ReclassifyResponse,
+)
+def reclassify_splits(user_id: int, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM users WHERE id = %s", (user_id,))
+    if not cur.fetchone():
+        raise HTTPException(404, detail="User not found")
+    cur.execute(
+        """SELECT s.id, s.pace_min_km
+           FROM splits s
+           JOIN activities a ON s.activity_id = a.id
+           WHERE a.user_id = %s""",
+        (user_id,),
+    )
+    splits = cur.fetchall()
+    for s in splits:
+        new_type = garmin_mod.classify_split(s["pace_min_km"])
+        cur.execute(
+            "UPDATE splits SET split_type = %s WHERE id = %s",
+            (new_type, s["id"]),
+        )
+    conn.commit()
+    return {"updated_splits": len(splits)}
 
 
 @app.get(
@@ -218,6 +247,7 @@ def list_user_splits(user_id: int, conn=Depends(get_db)):
     cur.execute(
         """SELECT s.split_number, s.distance_km, s.duration_min,
                   s.pace_min_km, s.avg_hr, s.elevation_gain_m,
+                  s.split_type,
                   a.id as activity_id, a.name as activity_name,
                   a.date as activity_date
            FROM splits s

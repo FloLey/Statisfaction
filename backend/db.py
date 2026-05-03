@@ -46,6 +46,11 @@ SCHEMA = [
         elevation_gain_m DOUBLE PRECISION
     )
     """,
+    """
+    ALTER TABLE splits
+        ADD COLUMN IF NOT EXISTS split_type TEXT
+        CHECK (split_type IN ('running', 'walking', 'idle', 'fast'))
+    """,
 ]
 
 

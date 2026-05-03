@@ -31,6 +31,7 @@ export interface Split {
   pace_min_km: number | null;
   avg_hr: number | null;
   elevation_gain_m: number | null;
+  split_type: string | null;
 }
 
 export interface ActivityDetailResponse extends Activity {
@@ -86,6 +87,15 @@ export async function getUserSplits(
 ): Promise<SplitWithActivity[]> {
   const { data } = await api.get<SplitWithActivity[]>(
     `/api/users/${userId}/splits`,
+  );
+  return data;
+}
+
+export async function reclassifySplits(
+  userId: number,
+): Promise<{ updated_splits: number }> {
+  const { data } = await api.post<{ updated_splits: number }>(
+    `/api/users/${userId}/reclassify`,
   );
   return data;
 }

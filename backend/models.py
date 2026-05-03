@@ -29,6 +29,7 @@ class SplitRead(BaseModel):
     pace_min_km: float | None
     avg_hr: int | None
     elevation_gain_m: float | None
+    split_type: str | None
 
 
 class ActivitySummary(BaseModel):
@@ -55,6 +56,11 @@ class SplitWithActivity(BaseModel):
     pace_min_km: float | None
     avg_hr: int | None
     elevation_gain_m: float | None
+    split_type: str | None
     activity_id: int
     activity_name: str
     activity_date: str
+
+
+class ReclassifyResponse(BaseModel):
+    updated_splits: int

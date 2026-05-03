@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { syncUser } from "../api";
+import { syncUser, reclassifySplits } from "../api";
 
 interface Props {
   userId: number;
@@ -10,8 +10,10 @@ interface Props {
 export default function SyncModal({ userId, onClose, onSynced }: Props) {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [reclassifying, setReclassifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
+  const [reclassifyResult, setReclassifyResult] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,6 +28,19 @@ export default function SyncModal({ userId, onClose, onSynced }: Props) {
       setError(detail ?? "Sync failed.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleReclassify = async () => {
+    setReclassifying(true);
+    setReclassifyResult(null);
+    try {
+      const data = await reclassifySplits(userId);
+      setReclassifyResult(`${data.updated_splits} splits reclassified.`);
+    } catch {
+      setReclassifyResult("Reclassification failed.");
+    } finally {
+      setReclassifying(false);
     }
   };
 
@@ -79,6 +94,24 @@ export default function SyncModal({ userId, onClose, onSynced }: Props) {
             </div>
           </form>
         )}
+
+        {/* Reclassify section */}
+        <div className="mt-5 pt-4 border-t border-gray-100">
+          <p className="text-xs text-gray-400 mb-2">
+            Reclassify all historical splits by pace (fast / running / walking / idle).
+          </p>
+          {reclassifyResult && (
+            <p className="text-sm text-green-600 mb-2">{reclassifyResult}</p>
+          )}
+          <button
+            type="button"
+            onClick={handleReclassify}
+            disabled={reclassifying}
+            className="text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50"
+          >
+            {reclassifying ? "Reclassifying..." : "Reclassify splits"}
+          </button>
+        </div>
       </div>
     </div>
   );
