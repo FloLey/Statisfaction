@@ -10,8 +10,17 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
-    "postgresql://statisfaction:statisfaction@localhost:5490/statisfactiondb",
+    "postgresql://statisfaction:statisfaction@localhost:5490/statisfactiondb_test",
 )
+
+_PROD_DB_NAMES = {"statisfactiondb"}
+_parsed_db_name = TEST_DATABASE_URL.rstrip("/").rsplit("/", 1)[-1]
+if _parsed_db_name in _PROD_DB_NAMES:
+    raise RuntimeError(
+        f"TEST_DATABASE_URL points to production database '{_parsed_db_name}'. "
+        "Set TEST_DATABASE_URL to a dedicated test database"
+        " (e.g. statisfactiondb_test)."
+    )
 
 
 @pytest.fixture(autouse=True)
