@@ -51,9 +51,10 @@ export default function PaceOverTimeChart({ splits }: Props) {
   if (valid.length < 2) return null;
 
   const paces = valid.map((s) => s.pace_min_km);
+  const durations = valid.map((s) => s.duration_min ?? null);
   const isRunMode = valid.every((s) => s.split_number === 1);
   const window = isRunMode ? 5 : Math.min(20, Math.floor(valid.length / 3));
-  const ma = computeMovingAverage(paces, Math.max(window, 2));
+  const ma = computeMovingAverage(paces, Math.max(window, 2), durations);
 
   const distances = valid.map((s) => s.distance_km ?? 0);
   const maxDist = Math.max(...distances, 1);

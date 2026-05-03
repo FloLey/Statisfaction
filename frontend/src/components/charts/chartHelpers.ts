@@ -19,12 +19,26 @@ export function paceTickFormatter(pace: number): string {
 export function computeMovingAverage(
   values: (number | null)[],
   window: number,
+  weights?: (number | null)[],
 ): (number | null)[] {
   return values.map((_, i) => {
     const start = Math.max(0, i - window + 1);
-    const slice = values.slice(start, i + 1).filter((v): v is number => v != null);
-    if (slice.length === 0) return null;
-    return slice.reduce((a, b) => a + b, 0) / slice.length;
+    if (!weights) {
+      const slice = values.slice(start, i + 1).filter((v): v is number => v != null);
+      if (slice.length === 0) return null;
+      return slice.reduce((a, b) => a + b, 0) / slice.length;
+    }
+    let weightedSum = 0;
+    let totalWeight = 0;
+    for (let j = start; j <= i; j++) {
+      const v = values[j];
+      const w = weights[j];
+      if (v != null && w != null && w > 0) {
+        weightedSum += v * w;
+        totalWeight += w;
+      }
+    }
+    return totalWeight === 0 ? null : weightedSum / totalWeight;
   });
 }
 
@@ -96,7 +110,7 @@ export interface MonthBucket {
 export function groupByMonth(activities: Activity[]): MonthBucket[] {
   const map = new Map<
     string,
-    { totalKm: number; paces: number[]; label: string }
+    { totalKm: number; totalDuration: number; totalDistance: number; label: string }
   >();
 
   for (const a of activities) {
@@ -110,11 +124,15 @@ export function groupByMonth(activities: Activity[]): MonthBucket[] {
     const existing = map.get(key);
     if (existing) {
       if (a.distance_km != null) existing.totalKm += a.distance_km;
-      if (a.avg_pace_min_km != null) existing.paces.push(a.avg_pace_min_km);
+      if (a.duration_min != null && a.distance_km != null) {
+        existing.totalDuration += a.duration_min;
+        existing.totalDistance += a.distance_km;
+      }
     } else {
       map.set(key, {
         totalKm: a.distance_km ?? 0,
-        paces: a.avg_pace_min_km != null ? [a.avg_pace_min_km] : [],
+        totalDuration: a.duration_min != null && a.distance_km != null ? a.duration_min : 0,
+        totalDistance: a.duration_min != null && a.distance_km != null ? a.distance_km : 0,
         label,
       });
     }
@@ -126,10 +144,8 @@ export function groupByMonth(activities: Activity[]): MonthBucket[] {
       month: v.label,
       totalKm: Math.round(v.totalKm * 100) / 100,
       avgPace:
-        v.paces.length > 0
-          ? Math.round(
-              (v.paces.reduce((a, b) => a + b, 0) / v.paces.length) * 100,
-            ) / 100
+        v.totalDistance > 0
+          ? Math.round((v.totalDuration / v.totalDistance) * 100) / 100
           : null,
     }));
 }
@@ -279,19 +295,17 @@ export function computePaceByDistanceBucket(
     const matching = activities.filter(
       (a) =>
         a.distance_km != null &&
-        a.avg_pace_min_km != null &&
+        a.duration_min != null &&
         a.distance_km >= r.min &&
         a.distance_km < r.max,
     );
-    const paces = matching.map((a) => a.avg_pace_min_km!);
+    const totalDuration = matching.reduce((s, a) => s + a.duration_min!, 0);
+    const totalDistance = matching.reduce((s, a) => s + a.distance_km!, 0);
     return {
       label: r.label,
-      avgPace:
-        paces.length > 0
-          ? Math.round(
-              (paces.reduce((a, b) => a + b, 0) / paces.length) * 100,
-            ) / 100
-          : null,
+      avgPace: totalDistance > 0
+        ? Math.round((totalDuration / totalDistance) * 100) / 100
+        : null,
       count: matching.length,
     };
   });

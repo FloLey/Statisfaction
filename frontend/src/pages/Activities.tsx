@@ -93,16 +93,20 @@ export default function Activities() {
       const totalKm = cleanActivities.reduce(
         (s, a) => s + (a.distance_km ?? 0), 0,
       );
-      const paces = cleanActivities
-        .map((a) => a.avg_pace_min_km)
-        .filter((p): p is number => p != null);
-      const avgPace = paces.length > 0
-        ? paces.reduce((a, b) => a + b, 0) / paces.length : null;
-      const hrs = cleanActivities
-        .map((a) => a.avg_hr)
-        .filter((h): h is number => h != null);
-      const avgHr = hrs.length > 0
-        ? Math.round(hrs.reduce((a, b) => a + b, 0) / hrs.length) : null;
+      const paceDuration = cleanActivities.reduce((s, a) =>
+        a.duration_min != null && a.distance_km != null
+          ? s + a.duration_min : s, 0);
+      const paceDistance = cleanActivities.reduce((s, a) =>
+        a.duration_min != null && a.distance_km != null
+          ? s + a.distance_km : s, 0);
+      const avgPace = paceDistance > 0 ? paceDuration / paceDistance : null;
+      const hrNumerator = cleanActivities.reduce((s, a) =>
+        a.avg_hr != null && a.duration_min != null
+          ? s + a.avg_hr * a.duration_min : s, 0);
+      const hrDenominator = cleanActivities.reduce((s, a) =>
+        a.avg_hr != null && a.duration_min != null
+          ? s + a.duration_min : s, 0);
+      const avgHr = hrDenominator > 0 ? Math.round(hrNumerator / hrDenominator) : null;
       return [
         { label: "Total Runs", value: String(cleanActivities.length) },
         { label: "Total Distance", value: formatDistance(totalKm) },
@@ -113,16 +117,20 @@ export default function Activities() {
       const totalKm = dataPoints.reduce(
         (s, sp) => s + (sp.distance_km ?? 0), 0,
       );
-      const paces = dataPoints
-        .map((sp) => sp.pace_min_km)
-        .filter((p): p is number => p != null);
-      const avgPace = paces.length > 0
-        ? paces.reduce((a, b) => a + b, 0) / paces.length : null;
-      const hrs = dataPoints
-        .map((sp) => sp.avg_hr)
-        .filter((h): h is number => h != null);
-      const avgHr = hrs.length > 0
-        ? Math.round(hrs.reduce((a, b) => a + b, 0) / hrs.length) : null;
+      const paceDuration = dataPoints.reduce((s, sp) =>
+        sp.duration_min != null && sp.distance_km != null
+          ? s + sp.duration_min : s, 0);
+      const paceDistance = dataPoints.reduce((s, sp) =>
+        sp.duration_min != null && sp.distance_km != null
+          ? s + sp.distance_km : s, 0);
+      const avgPace = paceDistance > 0 ? paceDuration / paceDistance : null;
+      const hrNumerator = dataPoints.reduce((s, sp) =>
+        sp.avg_hr != null && sp.duration_min != null
+          ? s + sp.avg_hr * sp.duration_min : s, 0);
+      const hrDenominator = dataPoints.reduce((s, sp) =>
+        sp.avg_hr != null && sp.duration_min != null
+          ? s + sp.duration_min : s, 0);
+      const avgHr = hrDenominator > 0 ? Math.round(hrNumerator / hrDenominator) : null;
       const uniqueRuns = new Set(dataPoints.map((sp) => sp.activity_id)).size;
       return [
         { label: "Total Splits", value: String(dataPoints.length) },
