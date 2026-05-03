@@ -45,6 +45,13 @@ describe("computeMovingAverage", () => {
     expect(result[1]).toBe(4);
     expect(result[2]).toBe(8);
   });
+
+  it("computes duration-weighted moving average", () => {
+    // window=2: result[0]=4 (only one point), result[1]=(4*1+8*3)/(1+3)=7
+    const result = computeMovingAverage([4, 8], 2, [1, 3]);
+    expect(result[0]).toBe(4);
+    expect(result[1]).toBe(7);
+  });
 });
 
 describe("groupByWeek", () => {
@@ -62,28 +69,32 @@ describe("groupByWeek", () => {
 });
 
 describe("groupByMonth", () => {
-  it("groups activities by month", () => {
+  it("groups activities by month with duration-weighted pace", () => {
     const activities = [
       makeActivity({
         date: "2026-03-15 08:00:00",
         distance_km: 10,
+        duration_min: 50,   // 50/10 = 5.0 min/km
         avg_pace_min_km: 5.0,
       }),
       makeActivity({
         date: "2026-03-20 08:00:00",
         distance_km: 8,
+        duration_min: 44,   // 44/8 = 5.5 min/km
         avg_pace_min_km: 5.5,
       }),
       makeActivity({
         date: "2026-04-01 08:00:00",
         distance_km: 12,
+        duration_min: 57.6, // 57.6/12 = 4.8 min/km
         avg_pace_min_km: 4.8,
       }),
     ];
     const months = groupByMonth(activities);
     expect(months.length).toBe(2);
     expect(months[0].totalKm).toBe(18);
-    expect(months[0].avgPace).toBe(5.25);
+    // Weighted: (50+44)/(10+8) = 94/18 ≈ 5.22
+    expect(months[0].avgPace).toBe(5.22);
   });
 });
 
