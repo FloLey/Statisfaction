@@ -255,6 +255,7 @@ def test_sync_success(mock_garmin, client):
             "pace_min_km": 5.0,
             "avg_hr": 150,
             "elevation_gain_m": 5.0,
+            "split_type": "running",
         }
     ]
 
@@ -310,4 +311,117 @@ def test_sync_idempotent(mock_garmin, client):
 
 def test_sync_user_not_found(client):
     resp = client.post("/api/users/999/sync", json={"password": "secret"})
+    assert resp.status_code == 404
+
+
+# -- Splits --
+
+
+def test_get_activity_splits_include_split_type(client):
+    resp = client.post("/api/users", json={"name": "Alice", "email": "a@g.com"})
+    user_id = resp.json()["id"]
+
+    import db as db_mod
+
+    conn = db_mod._connect()
+    cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO activities
+           (user_id, garmin_id, name, date, distance_km, duration_min,
+            avg_hr, max_hr, avg_pace_min_km, elevation_gain_m)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+           RETURNING id""",
+        (user_id, "abc", "Run", "2026-01-01 07:00:00", 5.0, 25.0, 150, 170, 5.0, 10.0),
+    )
+    activity_id = cur.fetchone()["id"]
+    cur.execute(
+        """INSERT INTO splits
+           (activity_id, split_number, distance_km,
+            duration_min, pace_min_km, avg_hr, elevation_gain_m, split_type)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+        (activity_id, 1, 1.0, 5.0, 5.0, 150, 2.0, "running"),
+    )
+    cur.execute(
+        """INSERT INTO splits
+           (activity_id, split_number, distance_km,
+            duration_min, pace_min_km, avg_hr, elevation_gain_m, split_type)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+        (activity_id, 2, 0.1, 3.0, 25.0, 90, 0.0, "idle"),
+    )
+    conn.commit()
+    conn.close()
+
+    resp = client.get(f"/api/activities/{activity_id}")
+    assert resp.status_code == 200
+    splits = resp.json()["splits"]
+    assert splits[0]["split_type"] == "running"
+    assert splits[1]["split_type"] == "idle"
+
+
+# -- Reclassify --
+
+
+def test_reclassify_splits(client):
+    resp = client.post("/api/users", json={"name": "Alice", "email": "a@g.com"})
+    user_id = resp.json()["id"]
+
+    import db as db_mod
+
+    conn = db_mod._connect()
+    cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO activities
+           (user_id, garmin_id, name, date, distance_km, duration_min,
+            avg_hr, max_hr, avg_pace_min_km, elevation_gain_m)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+           RETURNING id""",
+        (user_id, "xyz", "Run", "2026-01-01 07:00:00", 5.0, 25.0, 150, 170, 5.0, 10.0),
+    )
+    activity_id = cur.fetchone()["id"]
+    # Insert splits without split_type (simulating pre-backfill data)
+    cur.execute(
+        """INSERT INTO splits
+           (activity_id, split_number, distance_km,
+            duration_min, pace_min_km, avg_hr, elevation_gain_m)
+           VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+        (activity_id, 1, 1.0, 5.0, 5.0, 150, 2.0),  # running
+    )
+    cur.execute(
+        """INSERT INTO splits
+           (activity_id, split_number, distance_km,
+            duration_min, pace_min_km, avg_hr, elevation_gain_m)
+           VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+        (activity_id, 2, 0.5, 8.0, 15.0, 100, 0.0),  # walking
+    )
+    cur.execute(
+        """INSERT INTO splits
+           (activity_id, split_number, distance_km,
+            duration_min, pace_min_km, avg_hr, elevation_gain_m)
+           VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+        (activity_id, 3, 1.0, 3.5, 3.5, 175, 5.0),  # fast
+    )
+    conn.commit()
+    conn.close()
+
+    resp = client.post(f"/api/users/{user_id}/reclassify")
+    assert resp.status_code == 200
+    assert resp.json()["updated_splits"] == 3
+
+    # Verify types were set correctly
+    conn = db_mod._connect()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT split_number, split_type FROM splits"
+        " WHERE activity_id = %s ORDER BY split_number",
+        (activity_id,),
+    )
+    rows = cur.fetchall()
+    conn.close()
+    assert rows[0]["split_type"] == "running"
+    assert rows[1]["split_type"] == "walking"
+    assert rows[2]["split_type"] == "fast"
+
+
+def test_reclassify_user_not_found(client):
+    resp = client.post("/api/users/999/reclassify")
     assert resp.status_code == 404

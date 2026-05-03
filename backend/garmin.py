@@ -6,6 +6,20 @@ from garminconnect import Garmin
 
 RUNNING_TYPE_KEYS = {"running", "trail_running", "treadmill_running", "track_running"}
 
+PACE_IDLE_MIN_KM = 20.0
+PACE_WALKING_MIN_KM = 10.0
+PACE_FAST_MAX_MIN_KM = 4.0
+
+
+def classify_split(pace_min_km: float | None) -> str:
+    if pace_min_km is None or pace_min_km > PACE_IDLE_MIN_KM:
+        return "idle"
+    if pace_min_km > PACE_WALKING_MIN_KM:
+        return "walking"
+    if pace_min_km < PACE_FAST_MAX_MIN_KM:
+        return "fast"
+    return "running"
+
 
 def login(email: str, password: str) -> Garmin:
     client = Garmin(email=email, password=password)
@@ -30,14 +44,16 @@ def fetch_splits(client: Garmin, garmin_activity_id: str) -> list[dict]:
     laps = raw.get("lapDTOs", [])
     splits = []
     for i, lap in enumerate(laps, 1):
+        pace = pace_from_speed(lap.get("averageSpeed"))
         splits.append(
             {
                 "split_number": i,
                 "distance_km": round(lap.get("distance", 0) / 1000, 3),
                 "duration_min": round(lap.get("duration", 0) / 60, 2),
-                "pace_min_km": pace_from_speed(lap.get("averageSpeed")),
+                "pace_min_km": pace,
                 "avg_hr": lap.get("averageHR"),
                 "elevation_gain_m": lap.get("elevationGain"),
+                "split_type": classify_split(pace),
             }
         )
     return splits

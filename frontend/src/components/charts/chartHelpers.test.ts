@@ -5,8 +5,24 @@ import {
   groupByWeek,
   groupByMonth,
   bucketDistances,
+  markOutliers,
+  filterSplitsByType,
+  computePaceFromSplits,
+  computeHrFromSplits,
 } from "./chartHelpers";
-import { Activity } from "../../api";
+import { Activity, Split } from "../../api";
+
+function makeSplit(overrides: Partial<Split> & { split_number: number }): Split {
+  return {
+    distance_km: 1.0,
+    duration_min: 5.0,
+    pace_min_km: 5.0,
+    avg_hr: 150,
+    elevation_gain_m: 5,
+    split_type: "running",
+    ...overrides,
+  };
+}
 
 function makeActivity(
   overrides: Partial<Activity> & { date: string },
@@ -95,6 +111,100 @@ describe("groupByMonth", () => {
     expect(months[0].totalKm).toBe(18);
     // Weighted: (50+44)/(10+8) = 94/18 ≈ 5.22
     expect(months[0].avgPace).toBe(5.22);
+  });
+});
+
+describe("markOutliers", () => {
+  it("marks long idle splits as outliers", () => {
+    const splits = [
+      makeSplit({ split_number: 1, split_type: "idle", duration_min: 1, pace_min_km: 25 }),
+      makeSplit({ split_number: 2, split_type: "idle", duration_min: 10, pace_min_km: 25 }),
+    ];
+    const marked = markOutliers(splits);
+    expect(marked[0].isOutlier).toBe(false); // 1 min idle — short break
+    expect(marked[1].isOutlier).toBe(true);  // 10 min idle — forgotten watch
+  });
+
+  it("marks IQR outliers within the same type", () => {
+    // 5 tightly clustered splits + 1 extreme outlier
+    // Q1=5.1, Q3=5.3, IQR=0.2, upper fence=5.6 → 30.0 is clearly outside
+    const splits = [
+      makeSplit({ split_number: 1, pace_min_km: 5.0 }),
+      makeSplit({ split_number: 2, pace_min_km: 5.1 }),
+      makeSplit({ split_number: 3, pace_min_km: 5.2 }),
+      makeSplit({ split_number: 4, pace_min_km: 5.3 }),
+      makeSplit({ split_number: 5, pace_min_km: 30.0 }), // outlier
+    ];
+    const marked = markOutliers(splits);
+    expect(marked[4].isOutlier).toBe(true);
+    expect(marked[0].isOutlier).toBe(false);
+  });
+
+  it("does not mark null split_type splits as outliers", () => {
+    const splits = [makeSplit({ split_number: 1, split_type: null })];
+    const marked = markOutliers(splits);
+    expect(marked[0].isOutlier).toBe(false);
+  });
+});
+
+describe("filterSplitsByType", () => {
+  it("keeps only selected types", () => {
+    const splits = [
+      { ...makeSplit({ split_number: 1, split_type: "running" }), isOutlier: false },
+      { ...makeSplit({ split_number: 2, split_type: "walking" }), isOutlier: false },
+      { ...makeSplit({ split_number: 3, split_type: "idle" }), isOutlier: false },
+    ];
+    const result = filterSplitsByType(splits, new Set(["running"]), false);
+    expect(result.length).toBe(1);
+    expect(result[0].split_type).toBe("running");
+  });
+
+  it("excludes outliers when hideOutliers is true", () => {
+    const splits = [
+      { ...makeSplit({ split_number: 1, split_type: "running" }), isOutlier: false },
+      { ...makeSplit({ split_number: 2, split_type: "running" }), isOutlier: true },
+    ];
+    const result = filterSplitsByType(splits, new Set(["running"]), true);
+    expect(result.length).toBe(1);
+    expect(result[0].isOutlier).toBe(false);
+  });
+
+  it("always keeps null split_type splits", () => {
+    const splits = [
+      { ...makeSplit({ split_number: 1, split_type: null }), isOutlier: false },
+    ];
+    const result = filterSplitsByType(splits, new Set(["running"]), true);
+    expect(result.length).toBe(1);
+  });
+});
+
+describe("computePaceFromSplits", () => {
+  it("computes distance-weighted pace", () => {
+    const splits = [
+      makeSplit({ split_number: 1, distance_km: 1.0, duration_min: 5.0 }),  // 5 min/km
+      makeSplit({ split_number: 2, distance_km: 2.0, duration_min: 8.0 }),  // 4 min/km
+    ];
+    // (5+8)/(1+2) = 13/3 ≈ 4.33
+    expect(computePaceFromSplits(splits)).toBe(4.33);
+  });
+
+  it("returns null for empty input", () => {
+    expect(computePaceFromSplits([])).toBeNull();
+  });
+});
+
+describe("computeHrFromSplits", () => {
+  it("computes duration-weighted HR", () => {
+    const splits = [
+      makeSplit({ split_number: 1, avg_hr: 140, duration_min: 5 }),
+      makeSplit({ split_number: 2, avg_hr: 160, duration_min: 15 }),
+    ];
+    // (140*5 + 160*15) / (5+15) = (700+2400)/20 = 155
+    expect(computeHrFromSplits(splits)).toBe(155);
+  });
+
+  it("returns null for empty input", () => {
+    expect(computeHrFromSplits([])).toBeNull();
   });
 });
 

@@ -11,6 +11,7 @@ const splits: Split[] = [
     pace_min_km: 5.2,
     avg_hr: 150,
     elevation_gain_m: 5,
+    split_type: "running",
   },
   {
     split_number: 2,
@@ -19,6 +20,7 @@ const splits: Split[] = [
     pace_min_km: 4.8,
     avg_hr: 158,
     elevation_gain_m: 3,
+    split_type: "fast",
   },
 ];
 
@@ -46,10 +48,17 @@ describe("SplitsTable", () => {
         pace_min_km: null,
         avg_hr: null,
         elevation_gain_m: null,
+        split_type: null,
       },
     ];
     render(<SplitsTable splits={nullSplit} />);
     const dashes = screen.getAllByText("—");
     expect(dashes.length).toBeGreaterThan(0);
+  });
+
+  it("shows split type badges", () => {
+    render(<SplitsTable splits={splits} />);
+    expect(screen.getByText("running")).toBeInTheDocument();
+    expect(screen.getByText("fast")).toBeInTheDocument();
   });
 });

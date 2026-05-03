@@ -177,44 +177,97 @@ export function bucketDistances(activities: Activity[]): DistanceBucket[] {
   return counts;
 }
 
-export function removeOutliers(activities: Activity[]): Activity[] {
-  const paces = activities
-    .map((a) => a.avg_pace_min_km)
-    .filter((v): v is number => v != null)
-    .sort((a, b) => a - b);
+const IDLE_OUTLIER_DURATION_MIN = 5;
+const IQR_MULTIPLIER = 1.5;
 
-  if (paces.length < 4) return activities;
-
-  const q1 = paces[Math.floor(paces.length * 0.25)];
-  const q3 = paces[Math.floor(paces.length * 0.75)];
+function iqrBounds(values: number[]): { lower: number; upper: number } | null {
+  const sorted = [...values].sort((a, b) => a - b);
+  if (sorted.length < 4) return null;
+  const q1 = sorted[Math.floor(sorted.length * 0.25)];
+  const q3 = sorted[Math.floor(sorted.length * 0.75)];
   const iqr = q3 - q1;
-  const lower = q1 - 1.5 * iqr;
-  const upper = q3 + 1.5 * iqr;
+  return { lower: q1 - IQR_MULTIPLIER * iqr, upper: q3 + IQR_MULTIPLIER * iqr };
+}
 
-  return activities.filter((a) => {
-    if (a.avg_pace_min_km == null) return true;
-    return a.avg_pace_min_km >= lower && a.avg_pace_min_km <= upper;
+export type MarkedSplit<T extends Split> = T & { isOutlier: boolean };
+
+export function markOutliers<T extends Split>(splits: T[]): MarkedSplit<T>[] {
+  // Group paces by split_type for per-type IQR computation
+  const pacesByType = new Map<string, number[]>();
+  for (const s of splits) {
+    if (s.split_type == null || s.pace_min_km == null) continue;
+    const group = pacesByType.get(s.split_type) ?? [];
+    group.push(s.pace_min_km);
+    pacesByType.set(s.split_type, group);
+  }
+
+  const boundsCache = new Map<string, ReturnType<typeof iqrBounds>>();
+  for (const [type, paces] of pacesByType) {
+    boundsCache.set(type, iqrBounds(paces));
+  }
+
+  return splits.map((s) => {
+    if (s.split_type == null) return { ...s, isOutlier: false };
+
+    // Forgotten-watch guard: long idle segments
+    if (
+      s.split_type === "idle" &&
+      s.duration_min != null &&
+      s.duration_min > IDLE_OUTLIER_DURATION_MIN
+    ) {
+      return { ...s, isOutlier: true };
+    }
+
+    // IQR outlier within the split's type group
+    const bounds = boundsCache.get(s.split_type);
+    if (bounds && s.pace_min_km != null) {
+      if (s.pace_min_km < bounds.lower || s.pace_min_km > bounds.upper) {
+        return { ...s, isOutlier: true };
+      }
+    }
+
+    return { ...s, isOutlier: false };
   });
 }
 
-export function removeSplitOutliers<T extends Split>(splits: T[]): T[] {
-  const paces = splits
-    .map((s) => s.pace_min_km)
-    .filter((v): v is number => v != null)
-    .sort((a, b) => a - b);
-
-  if (paces.length < 4) return splits;
-
-  const q1 = paces[Math.floor(paces.length * 0.25)];
-  const q3 = paces[Math.floor(paces.length * 0.75)];
-  const iqr = q3 - q1;
-  const lower = q1 - 1.5 * iqr;
-  const upper = q3 + 1.5 * iqr;
-
+export function filterSplitsByType<T extends Split & { isOutlier: boolean }>(
+  splits: T[],
+  selectedTypes: Set<string>,
+  hideOutliers: boolean,
+): T[] {
   return splits.filter((s) => {
-    if (s.pace_min_km == null) return true;
-    return s.pace_min_km >= lower && s.pace_min_km <= upper;
+    // Pre-backfill splits (null type) are always kept
+    if (s.split_type == null) return true;
+    if (!selectedTypes.has(s.split_type)) return false;
+    if (hideOutliers && s.isOutlier) return false;
+    return true;
   });
+}
+
+export function computePaceFromSplits(splits: Split[]): number | null {
+  let totalDuration = 0;
+  let totalDistance = 0;
+  for (const s of splits) {
+    if (s.duration_min != null && s.distance_km != null && s.distance_km > 0) {
+      totalDuration += s.duration_min;
+      totalDistance += s.distance_km;
+    }
+  }
+  return totalDistance > 0
+    ? Math.round((totalDuration / totalDistance) * 100) / 100
+    : null;
+}
+
+export function computeHrFromSplits(splits: Split[]): number | null {
+  let weightedSum = 0;
+  let totalDuration = 0;
+  for (const s of splits) {
+    if (s.avg_hr != null && s.duration_min != null && s.duration_min > 0) {
+      weightedSum += s.avg_hr * s.duration_min;
+      totalDuration += s.duration_min;
+    }
+  }
+  return totalDuration > 0 ? Math.round(weightedSum / totalDuration) : null;
 }
 
 export function activitiesToSplitLike(
@@ -227,6 +280,7 @@ export function activitiesToSplitLike(
     pace_min_km: a.avg_pace_min_km,
     avg_hr: a.avg_hr,
     elevation_gain_m: a.elevation_gain_m,
+    split_type: null,
     activity_id: a.id,
     activity_name: a.name,
     activity_date: a.date,
