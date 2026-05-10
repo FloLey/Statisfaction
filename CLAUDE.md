@@ -16,9 +16,10 @@
 ## Linting
 
 - Always lint before committing:
-  - **Backend:** `cd backend && ruff check .`
+  - **Backend:** `cd backend && ruff check . && black --check .`
   - **Frontend:** `cd frontend && npx tsc --noEmit`
 - Fix all lint errors before pushing. Do not suppress or ignore lint rules without justification.
+- **Black version must match CI exactly.** Install dev dependencies from `requirements-dev.txt` (`pip install -r backend/requirements-dev.txt`) — do not install black independently or you risk a version mismatch. The pinned version is `black==26.3.1`. To auto-fix formatting run `black .` from the `backend/` directory.
 
 ## Workflow Summary
 
