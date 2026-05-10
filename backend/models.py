@@ -70,12 +70,12 @@ class ReclassifyResponse(BaseModel):
 
 
 class UserSettings(BaseModel):
-    pace_fast_max_min_km: float = 4.0
+    pace_fast_max_min_km: float = 4.5
     pace_walking_min_km: float = 10.0
     pace_idle_min_km: float = 20.0
     long_run_min_km: float = 12.0
     hills_elev_per_km_threshold: float = 30.0
     tempo_min_fast_fraction: float = 0.15
     interval_min_fast_splits: int = 2
-    interval_alt_ratio: float = 0.60
-    iqr_multiplier: float = 2.5
+    interval_alt_ratio: float = 0.3
+    iqr_multiplier: float = 6.0

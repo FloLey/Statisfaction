@@ -613,9 +613,9 @@ def test_get_settings_returns_defaults(client):
     resp = client.get(f"/api/users/{user_id}/settings")
     assert resp.status_code == 200
     data = resp.json()
-    assert data["pace_fast_max_min_km"] == 4.0
+    assert data["pace_fast_max_min_km"] == 4.5
     assert data["long_run_min_km"] == 12.0
-    assert data["interval_alt_ratio"] == 0.60
+    assert data["interval_alt_ratio"] == 0.3
 
 
 def test_put_settings_upsert(client):
