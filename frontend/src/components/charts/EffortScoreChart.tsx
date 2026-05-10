@@ -29,7 +29,8 @@ export default function EffortScoreChart({ splits }: Props) {
   const efforts = valid.map((s) => Math.round(s.pace_min_km! * s.avg_hr!));
   const isRunMode = valid.every((s) => s.split_number === 1);
   const window = isRunMode ? 5 : Math.min(20, Math.floor(valid.length / 3));
-  const ma = computeMovingAverage(efforts, Math.max(window, 2));
+  const durations = valid.map((s) => s.duration_min ?? 1);
+  const ma = computeMovingAverage(efforts, Math.max(window, 2), durations);
 
   const dateLabels = new Map<number, string>();
   if (!isRunMode) {

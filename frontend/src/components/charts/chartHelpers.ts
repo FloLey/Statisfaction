@@ -16,6 +16,18 @@ export function paceTickFormatter(pace: number): string {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
+// Grade-adjusted pace using Strava-style linear approximation (~0.033 min/km per 1% grade).
+// elevation_gain_m / distance_km gives m/km; divide by 10 to get grade %.
+export function gradeAdjustedPace(
+  pace_min_km: number,
+  elevation_gain_m: number | null,
+  distance_km: number | null,
+): number {
+  if (!elevation_gain_m || !distance_km || distance_km === 0) return pace_min_km;
+  const grade_pct = (elevation_gain_m / (distance_km * 1000)) * 100;
+  return pace_min_km / (1 + 0.033 * grade_pct);
+}
+
 export function computeMovingAverage(
   values: (number | null)[],
   window: number,
@@ -178,33 +190,34 @@ export function bucketDistances(activities: Activity[]): DistanceBucket[] {
 }
 
 const IDLE_OUTLIER_DURATION_MIN = 5;
-const IQR_MULTIPLIER = 1.5;
+export const DEFAULT_IQR_MULTIPLIER = 2.5;
 
-function iqrBounds(values: number[]): { lower: number; upper: number } | null {
+function iqrBounds(
+  values: number[],
+  multiplier: number,
+): { lower: number; upper: number } | null {
   const sorted = [...values].sort((a, b) => a - b);
   if (sorted.length < 4) return null;
   const q1 = sorted[Math.floor(sorted.length * 0.25)];
   const q3 = sorted[Math.floor(sorted.length * 0.75)];
   const iqr = q3 - q1;
-  return { lower: q1 - IQR_MULTIPLIER * iqr, upper: q3 + IQR_MULTIPLIER * iqr };
+  return { lower: q1 - multiplier * iqr, upper: q3 + multiplier * iqr };
 }
 
 export type MarkedSplit<T extends Split> = T & { isOutlier: boolean };
 
-export function markOutliers<T extends Split>(splits: T[]): MarkedSplit<T>[] {
-  // Group paces by split_type for per-type IQR computation
-  const pacesByType = new Map<string, number[]>();
+export function markOutliers<T extends Split>(
+  splits: T[],
+  iqrMultiplier: number = DEFAULT_IQR_MULTIPLIER,
+): MarkedSplit<T>[] {
+  // Compute IQR bounds across all non-idle splits combined to avoid
+  // boundary artifacts between fast/running/walking categories
+  const allNonIdlePaces: number[] = [];
   for (const s of splits) {
-    if (s.split_type == null || s.pace_min_km == null) continue;
-    const group = pacesByType.get(s.split_type) ?? [];
-    group.push(s.pace_min_km);
-    pacesByType.set(s.split_type, group);
+    if (s.split_type == null || s.split_type === "idle" || s.pace_min_km == null) continue;
+    allNonIdlePaces.push(s.pace_min_km);
   }
-
-  const boundsCache = new Map<string, ReturnType<typeof iqrBounds>>();
-  for (const [type, paces] of pacesByType) {
-    boundsCache.set(type, iqrBounds(paces));
-  }
+  const combinedBounds = iqrBounds(allNonIdlePaces, iqrMultiplier);
 
   return splits.map((s) => {
     if (s.split_type == null) return { ...s, isOutlier: false };
@@ -218,10 +231,11 @@ export function markOutliers<T extends Split>(splits: T[]): MarkedSplit<T>[] {
       return { ...s, isOutlier: true };
     }
 
-    // IQR outlier within the split's type group
-    const bounds = boundsCache.get(s.split_type);
-    if (bounds && s.pace_min_km != null) {
-      if (s.pace_min_km < bounds.lower || s.pace_min_km > bounds.upper) {
+    if (s.split_type === "idle") return { ...s, isOutlier: false };
+
+    // IQR outlier across all non-idle split types combined
+    if (combinedBounds && s.pace_min_km != null) {
+      if (s.pace_min_km < combinedBounds.lower || s.pace_min_km > combinedBounds.upper) {
         return { ...s, isOutlier: true };
       }
     }
@@ -230,17 +244,31 @@ export function markOutliers<T extends Split>(splits: T[]): MarkedSplit<T>[] {
   });
 }
 
+export function filterNonRunningActivities<T extends Split & { activity_id: number }>(
+  splits: T[],
+): T[] {
+  const activityHasRunning = new Map<number, boolean>();
+  for (const s of splits) {
+    if (s.split_type === "fast" || s.split_type === "running") {
+      activityHasRunning.set(s.activity_id, true);
+    } else if (!activityHasRunning.has(s.activity_id)) {
+      activityHasRunning.set(s.activity_id, false);
+    }
+  }
+  return splits.filter((s) => activityHasRunning.get(s.activity_id) === true);
+}
+
 export function filterSplitsByType<T extends Split & { isOutlier: boolean }>(
   splits: T[],
   selectedTypes: Set<string>,
-  hideOutliers: boolean,
+  showOutliers: boolean,
 ): T[] {
   return splits.filter((s) => {
     // Pre-backfill splits (null type) are always kept
     if (s.split_type == null) return true;
-    if (!selectedTypes.has(s.split_type)) return false;
-    if (hideOutliers && s.isOutlier) return false;
-    return true;
+    // Outliers are shown only when the outliers toggle is on, bypassing type filters
+    if (s.isOutlier) return showOutliers;
+    return selectedTypes.has(s.split_type);
   });
 }
 

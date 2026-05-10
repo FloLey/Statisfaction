@@ -7,10 +7,11 @@ import {
   bucketDistances,
   markOutliers,
   filterSplitsByType,
+  filterNonRunningActivities,
   computePaceFromSplits,
   computeHrFromSplits,
 } from "./chartHelpers";
-import { Activity, Split } from "../../api";
+import { Activity, Split, SplitWithActivity } from "../../api";
 
 function makeSplit(overrides: Partial<Split> & { split_number: number }): Split {
   return {
@@ -29,6 +30,7 @@ function makeActivity(
 ): Activity {
   return {
     id: 1,
+    user_id: 1,
     garmin_id: "1",
     name: "Run",
     distance_km: 10,
@@ -126,19 +128,37 @@ describe("markOutliers", () => {
     expect(marked[1].isOutlier).toBe(true);  // 10 min idle — forgotten watch
   });
 
-  it("marks IQR outliers within the same type", () => {
-    // 5 tightly clustered splits + 1 extreme outlier
-    // Q1=5.1, Q3=5.3, IQR=0.2, upper fence=5.6 → 30.0 is clearly outside
+  it("marks IQR outliers using combined non-idle pace distribution", () => {
+    // Mix of fast/running/walking — IQR computed across all together (multiplier=1.5)
+    // paces sorted: [3.5, 5.0, 5.1, 5.2, 8.0] → Q1=3.5, Q3=8.0, IQR=4.5
+    // fence: lower=3.5-6.75=-3.25, upper=8.0+6.75=14.75 → 30.0 is outside
+    const splits = [
+      makeSplit({ split_number: 1, split_type: "fast", pace_min_km: 3.5 }),
+      makeSplit({ split_number: 2, split_type: "running", pace_min_km: 5.0 }),
+      makeSplit({ split_number: 3, split_type: "running", pace_min_km: 5.1 }),
+      makeSplit({ split_number: 4, split_type: "running", pace_min_km: 5.2 }),
+      makeSplit({ split_number: 5, split_type: "walking", pace_min_km: 8.0 }),
+      makeSplit({ split_number: 6, split_type: "running", pace_min_km: 30.0 }), // outlier
+    ];
+    const marked = markOutliers(splits, 1.5);
+    expect(marked[5].isOutlier).toBe(true);
+    expect(marked[0].isOutlier).toBe(false); // fast split not flagged despite being fast
+    expect(marked[4].isOutlier).toBe(false); // walking split not flagged despite being slow
+  });
+
+  it("flags fewer outliers with a higher IQR multiplier", () => {
+    // paces: [5.0, 5.1, 5.2, 5.3, 9.0] → Q1=5.0, Q3=9.0, IQR=4.0
+    // multiplier=1.5: upper=9.0+6.0=15.0 → 16.0 is outlier
+    // multiplier=3.0: upper=9.0+12.0=21.0 → 16.0 is NOT outlier
     const splits = [
       makeSplit({ split_number: 1, pace_min_km: 5.0 }),
       makeSplit({ split_number: 2, pace_min_km: 5.1 }),
       makeSplit({ split_number: 3, pace_min_km: 5.2 }),
-      makeSplit({ split_number: 4, pace_min_km: 5.3 }),
-      makeSplit({ split_number: 5, pace_min_km: 30.0 }), // outlier
+      makeSplit({ split_number: 4, pace_min_km: 9.0 }),
+      makeSplit({ split_number: 5, pace_min_km: 16.0 }),
     ];
-    const marked = markOutliers(splits);
-    expect(marked[4].isOutlier).toBe(true);
-    expect(marked[0].isOutlier).toBe(false);
+    expect(markOutliers(splits, 1.5)[4].isOutlier).toBe(true);
+    expect(markOutliers(splits, 3.0)[4].isOutlier).toBe(false);
   });
 
   it("does not mark null split_type splits as outliers", () => {
@@ -160,21 +180,31 @@ describe("filterSplitsByType", () => {
     expect(result[0].split_type).toBe("running");
   });
 
-  it("excludes outliers when hideOutliers is true", () => {
+  it("excludes outliers when showOutliers is false", () => {
     const splits = [
       { ...makeSplit({ split_number: 1, split_type: "running" }), isOutlier: false },
       { ...makeSplit({ split_number: 2, split_type: "running" }), isOutlier: true },
     ];
-    const result = filterSplitsByType(splits, new Set(["running"]), true);
+    const result = filterSplitsByType(splits, new Set(["running"]), false);
     expect(result.length).toBe(1);
     expect(result[0].isOutlier).toBe(false);
+  });
+
+  it("includes outliers when showOutliers is true, regardless of type filter", () => {
+    const splits = [
+      { ...makeSplit({ split_number: 1, split_type: "running" }), isOutlier: false },
+      { ...makeSplit({ split_number: 2, split_type: "walking" }), isOutlier: true },
+    ];
+    // Only "running" selected, but showOutliers=true → running non-outlier + walking outlier
+    const result = filterSplitsByType(splits, new Set(["running"]), true);
+    expect(result.length).toBe(2);
   });
 
   it("always keeps null split_type splits", () => {
     const splits = [
       { ...makeSplit({ split_number: 1, split_type: null }), isOutlier: false },
     ];
-    const result = filterSplitsByType(splits, new Set(["running"]), true);
+    const result = filterSplitsByType(splits, new Set(["running"]), false);
     expect(result.length).toBe(1);
   });
 });
@@ -206,6 +236,52 @@ describe("computeHrFromSplits", () => {
 
   it("returns null for empty input", () => {
     expect(computeHrFromSplits([])).toBeNull();
+  });
+});
+
+function makeSplitWithActivity(
+  overrides: Partial<SplitWithActivity> & { split_number: number; activity_id: number },
+): SplitWithActivity {
+  return {
+    activity_name: "Test run",
+    activity_date: "2026-01-01",
+    distance_km: 1.0,
+    duration_min: 5.0,
+    pace_min_km: 5.0,
+    avg_hr: 150,
+    elevation_gain_m: 5,
+    split_type: "running",
+    ...overrides,
+  };
+}
+
+describe("filterNonRunningActivities", () => {
+  it("keeps activities that have at least one running or fast split", () => {
+    const splits = [
+      makeSplitWithActivity({ split_number: 1, activity_id: 1, split_type: "running" }),
+      makeSplitWithActivity({ split_number: 2, activity_id: 1, split_type: "idle" }),
+    ];
+    expect(filterNonRunningActivities(splits)).toHaveLength(2);
+  });
+
+  it("removes activities with only idle/walk splits", () => {
+    const splits = [
+      makeSplitWithActivity({ split_number: 1, activity_id: 2, split_type: "walking" }),
+      makeSplitWithActivity({ split_number: 2, activity_id: 2, split_type: "idle" }),
+    ];
+    expect(filterNonRunningActivities(splits)).toHaveLength(0);
+  });
+
+  it("keeps running activities and removes walk-only ones", () => {
+    const splits = [
+      makeSplitWithActivity({ split_number: 1, activity_id: 1, split_type: "running" }),
+      makeSplitWithActivity({ split_number: 2, activity_id: 1, split_type: "walking" }),
+      makeSplitWithActivity({ split_number: 1, activity_id: 2, split_type: "walking" }),
+      makeSplitWithActivity({ split_number: 2, activity_id: 2, split_type: "idle" }),
+    ];
+    const result = filterNonRunningActivities(splits);
+    expect(result).toHaveLength(2);
+    expect(result.every((s) => s.activity_id === 1)).toBe(true);
   });
 });
 

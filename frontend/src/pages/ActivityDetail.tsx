@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { getActivityDetail, ActivityDetailResponse } from "../api";
+import { getActivityDetail, getUserSettings, ActivityDetailResponse } from "../api";
 import {
   formatDate,
   formatDistance,
@@ -10,18 +10,21 @@ import {
 import SplitCharts from "../components/charts/SplitCharts";
 import SplitsTable from "../components/SplitsTable";
 import RunTypeBadge from "../components/RunTypeBadge";
+import { DEFAULT_IQR_MULTIPLIER } from "../components/charts/chartHelpers";
 
 export default function ActivityDetail() {
   const { activityId } = useParams<{ activityId: string }>();
-  const [activity, setActivity] = useState<ActivityDetailResponse | null>(
-    null,
-  );
+  const [activity, setActivity] = useState<ActivityDetailResponse | null>(null);
+  const [iqrMultiplier, setIqrMultiplier] = useState(DEFAULT_IQR_MULTIPLIER);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
       try {
-        setActivity(await getActivityDetail(Number(activityId)));
+        const act = await getActivityDetail(Number(activityId));
+        setActivity(act);
+        const settings = await getUserSettings(act.user_id);
+        setIqrMultiplier(settings.iqr_multiplier);
       } catch {
         setError("Activity not found.");
       }
@@ -102,6 +105,7 @@ export default function ActivityDetail() {
           <SplitCharts
             splits={activity.splits}
             avgPace={activity.avg_pace_min_km}
+            iqrMultiplier={iqrMultiplier}
           />
         </div>
       )}

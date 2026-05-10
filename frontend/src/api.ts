@@ -13,6 +13,7 @@ export interface User {
 
 export interface Activity {
   id: number;
+  user_id: number;
   garmin_id: string;
   name: string;
   date: string;
@@ -101,6 +102,7 @@ export interface UserSettings {
   tempo_min_fast_fraction: number;
   interval_min_fast_splits: number;
   interval_alt_ratio: number;
+  iqr_multiplier: number;
 }
 
 export async function getUserSettings(userId: number): Promise<UserSettings> {

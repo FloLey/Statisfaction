@@ -34,6 +34,7 @@ class SplitRead(BaseModel):
 
 class ActivitySummary(BaseModel):
     id: int
+    user_id: int
     garmin_id: str
     name: str
     date: str
@@ -77,3 +78,4 @@ class UserSettings(BaseModel):
     tempo_min_fast_fraction: float = 0.15
     interval_min_fast_splits: int = 2
     interval_alt_ratio: float = 0.60
+    iqr_multiplier: float = 2.5

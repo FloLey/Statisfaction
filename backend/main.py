@@ -209,7 +209,7 @@ def list_activities(user_id: int, conn=Depends(get_db)):
 def get_activity(activity_id: int, conn=Depends(get_db)):
     cur = conn.cursor()
     cur.execute(
-        "SELECT id, garmin_id, name, date, distance_km, duration_min,"
+        "SELECT id, user_id, garmin_id, name, date, distance_km, duration_min,"
         " avg_hr, max_hr, avg_pace_min_km, elevation_gain_m, run_type"
         " FROM activities WHERE id = %s",
         (activity_id,),
@@ -303,8 +303,9 @@ def update_user_settings(
                user_id,
                pace_fast_max_min_km, pace_walking_min_km, pace_idle_min_km,
                long_run_min_km, hills_elev_per_km_threshold,
-               tempo_min_fast_fraction, interval_min_fast_splits, interval_alt_ratio
-           ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+               tempo_min_fast_fraction, interval_min_fast_splits, interval_alt_ratio,
+               iqr_multiplier
+           ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
            ON CONFLICT (user_id) DO UPDATE SET
                pace_fast_max_min_km        = EXCLUDED.pace_fast_max_min_km,
                pace_walking_min_km         = EXCLUDED.pace_walking_min_km,
@@ -313,7 +314,8 @@ def update_user_settings(
                hills_elev_per_km_threshold = EXCLUDED.hills_elev_per_km_threshold,
                tempo_min_fast_fraction     = EXCLUDED.tempo_min_fast_fraction,
                interval_min_fast_splits    = EXCLUDED.interval_min_fast_splits,
-               interval_alt_ratio          = EXCLUDED.interval_alt_ratio""",
+               interval_alt_ratio          = EXCLUDED.interval_alt_ratio,
+               iqr_multiplier              = EXCLUDED.iqr_multiplier""",
         (
             user_id,
             body.pace_fast_max_min_km,
@@ -324,6 +326,7 @@ def update_user_settings(
             body.tempo_min_fast_fraction,
             body.interval_min_fast_splits,
             body.interval_alt_ratio,
+            body.iqr_multiplier,
         ),
     )
     conn.commit()

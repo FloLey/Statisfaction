@@ -3,6 +3,7 @@ import { useParams, useOutletContext, useNavigate } from "react-router-dom";
 import {
   getActivities,
   getUserSplits,
+  getUserSettings,
   Activity,
   SplitWithActivity,
   User,
@@ -12,10 +13,12 @@ import { useActivityFilters } from "../hooks/useActivityFilters";
 import {
   markOutliers,
   filterSplitsByType,
+  filterNonRunningActivities,
   computePaceFromSplits,
   computeHrFromSplits,
   activitiesToSplitLike,
   MarkedSplit,
+  DEFAULT_IQR_MULTIPLIER,
 } from "../components/charts/chartHelpers";
 import FilterBar from "../components/FilterBar";
 import ActivityRow from "../components/ActivityRow";
@@ -47,13 +50,13 @@ export default function Activities() {
   const navigate = useNavigate();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [allSplits, setAllSplits] = useState<SplitWithActivity[]>([]);
+  const [iqrMultiplier, setIqrMultiplier] = useState(DEFAULT_IQR_MULTIPLIER);
   const [showSync, setShowSync] = useState(false);
   const [view, setView] = useState<View>("table");
   const [granularity, setGranularity] = useState<Granularity>("splits");
   const [selectedSplitTypes, setSelectedSplitTypes] = useState<Set<string>>(
     new Set(DEFAULT_SELECTED_TYPES),
   );
-  const [hideOutliers, setHideOutliers] = useState(true);
   const [showSplitFilter, setShowSplitFilter] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const splitFilterRef = useRef<HTMLDivElement>(null);
@@ -71,12 +74,14 @@ export default function Activities() {
 
   const fetchActivities = async () => {
     try {
-      const [acts, splits] = await Promise.all([
+      const [acts, splits, settings] = await Promise.all([
         getActivities(uid),
         getUserSplits(uid),
+        getUserSettings(uid),
       ]);
       setActivities(acts);
       setAllSplits(splits);
+      setIqrMultiplier(settings.iqr_multiplier);
     } catch {
       setError("Failed to load activities.");
     }
@@ -103,36 +108,51 @@ export default function Activities() {
     filteredActivityIds.has(s.activity_id),
   );
 
-  // Mark outliers, then filter by selected types + outlier preference
-  const markedSplits: MarkedSplit<SplitWithActivity>[] = useMemo(
-    () => markOutliers(filteredSplits),
+  // Exclude activities composed entirely of idle/walk splits (hikes, walks)
+  const runningSplits = useMemo(
+    () => filterNonRunningActivities(filteredSplits),
     [filteredSplits],
   );
+  const runningActivityIds = useMemo(
+    () => new Set(runningSplits.map((s) => s.activity_id)),
+    [runningSplits],
+  );
+  const runningActivities = useMemo(
+    () => filteredActivities.filter((a) => runningActivityIds.has(a.id)),
+    [filteredActivities, runningActivityIds],
+  );
 
+  // Mark outliers, then filter by selected types + outlier preference
+  const markedSplits: MarkedSplit<SplitWithActivity>[] = useMemo(
+    () => markOutliers(runningSplits, iqrMultiplier),
+    [runningSplits, iqrMultiplier],
+  );
+
+  const showOutliers = selectedSplitTypes.has("outliers");
   const cleanSplits: MarkedSplit<SplitWithActivity>[] = useMemo(
-    () => filterSplitsByType(markedSplits, selectedSplitTypes, hideOutliers),
-    [markedSplits, selectedSplitTypes, hideOutliers],
+    () => filterSplitsByType(markedSplits, selectedSplitTypes, showOutliers),
+    [markedSplits, selectedSplitTypes, showOutliers],
   );
 
   const dataPoints: MarkedSplit<SplitWithActivity>[] = useMemo(() => {
     if (granularity === "splits") return cleanSplits;
-    return activitiesToSplitLike(filteredActivities).map((s) => ({
+    return activitiesToSplitLike(runningActivities).map((s) => ({
       ...s,
       isOutlier: false,
     }));
-  }, [cleanSplits, filteredActivities, granularity]);
+  }, [cleanSplits, runningActivities, granularity]);
 
   // Stats — in "runs" mode, pace/HR come from filtered splits when available
   const stats = useMemo(() => {
     if (granularity === "runs") {
-      const totalKm = filteredActivities.reduce(
+      const totalKm = runningActivities.reduce(
         (s, a) => s + (a.distance_km ?? 0),
         0,
       );
       const avgPace = computePaceFromSplits(cleanSplits);
       const avgHr = computeHrFromSplits(cleanSplits);
       return [
-        { label: "Total Runs", value: String(filteredActivities.length) },
+        { label: "Total Runs", value: String(runningActivities.length) },
         { label: "Total Distance", value: formatDistance(totalKm) },
         { label: "Avg Pace", value: formatPace(avgPace) },
         { label: "Avg Heart Rate", value: avgHr != null ? `${avgHr} bpm` : "—" },
@@ -152,7 +172,7 @@ export default function Activities() {
         { label: "Avg Split HR", value: avgHr != null ? `${avgHr} bpm` : "—" },
       ];
     }
-  }, [granularity, filteredActivities, cleanSplits, dataPoints]);
+  }, [granularity, runningActivities, cleanSplits, dataPoints]);
 
   function toggleType(type: string) {
     setSelectedSplitTypes((prev) => {
@@ -167,6 +187,7 @@ export default function Activities() {
     selectedSplitTypes.has(t),
   )
     .map((t) => SPLIT_TYPE_LABELS[t])
+    .concat(showOutliers ? ["Outliers"] : [])
     .join(", ");
 
   const outlierCount = markedSplits.filter((s) => s.isOutlier).length;
@@ -290,21 +311,23 @@ export default function Activities() {
                     {SPLIT_TYPE_LABELS[type]}
                   </label>
                 ))}
-                <div className="border-t border-gray-100 my-1" />
-                <label className="flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={hideOutliers}
-                    onChange={(e) => setHideOutliers(e.target.checked)}
-                    className="rounded border-gray-300"
-                  />
-                  Hide outliers
-                  {outlierCount > 0 && (
-                    <span className="ml-auto text-xs text-gray-400">
-                      {outlierCount}
-                    </span>
-                  )}
-                </label>
+                {outlierCount > 0 && (
+                  <>
+                    <div className="border-t border-gray-100 my-1" />
+                    <label className="flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={showOutliers}
+                        onChange={() => toggleType("outliers")}
+                        className="rounded border-gray-300"
+                      />
+                      Outliers
+                      <span className="ml-auto text-xs text-gray-400">
+                        {outlierCount}
+                      </span>
+                    </label>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -341,7 +364,7 @@ export default function Activities() {
         </div>
       )}
 
-      {filteredActivities.length > 0 && view === "table" && granularity === "runs" && (
+      {runningActivities.length > 0 && view === "table" && granularity === "runs" && (
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -358,7 +381,7 @@ export default function Activities() {
                 </tr>
               </thead>
               <tbody>
-                {filteredActivities.map((a) => (
+                {runningActivities.map((a) => (
                   <ActivityRow key={a.id} activity={a} />
                 ))}
               </tbody>
@@ -394,10 +417,11 @@ export default function Activities() {
         </div>
       )}
 
-      {filteredActivities.length > 0 && view === "charts" && (
+      {runningActivities.length > 0 && view === "charts" && (
         <ProgressCharts
-          activities={filteredActivities}
+          activities={runningActivities}
           splits={dataPoints}
+          granularity={granularity}
         />
       )}
 

@@ -5,6 +5,7 @@ import { MarkedSplit } from "./chartHelpers";
 // Tab 1 — Training Load
 import WeeklyMileageChart from "./WeeklyMileageChart";
 import WeeklyElevationChart from "./WeeklyElevationChart";
+import WeeklyElevationPerKmChart from "./WeeklyElevationPerKmChart";
 import LongestRunPerWeekChart from "./LongestRunPerWeekChart";
 import RunFrequencyChart from "./RunFrequencyChart";
 import MonthlyVolumeChart from "./MonthlyVolumeChart";
@@ -27,10 +28,12 @@ import CumulativeDistanceChart from "./CumulativeDistanceChart";
 import DistanceDistribution from "./DistanceDistribution";
 
 type ChartsTab = "load" | "performance" | "mix";
+type Granularity = "runs" | "splits";
 
 interface Props {
   activities: Activity[];
   splits: MarkedSplit<SplitWithActivity>[];
+  granularity: Granularity;
 }
 
 function Card({ children }: { children: ReactNode }) {
@@ -43,7 +46,7 @@ const TABS: { id: ChartsTab; label: string; subtitle: string }[] = [
   { id: "mix", label: "Training Mix", subtitle: "Run type balance" },
 ];
 
-export default function ProgressCharts({ activities, splits }: Props) {
+export default function ProgressCharts({ activities, splits, granularity }: Props) {
   const [activeTab, setActiveTab] = useState<ChartsTab>("load");
 
   if (activities.length < 2) {
@@ -82,6 +85,7 @@ export default function ProgressCharts({ activities, splits }: Props) {
           <Card><WeeklyMileageChart activities={activities} /></Card>
           <Card><WeeklyElevationChart activities={activities} /></Card>
           <Card><LongestRunPerWeekChart activities={activities} /></Card>
+          <Card><WeeklyElevationPerKmChart activities={activities} /></Card>
           <Card><RunFrequencyChart activities={activities} /></Card>
           <div className="lg:col-span-2">
             <Card><MonthlyVolumeChart activities={activities} /></Card>
@@ -98,7 +102,7 @@ export default function ProgressCharts({ activities, splits }: Props) {
           <Card><PaceOverTimeChart splits={splits} /></Card>
           <Card><GradeAdjustedPaceChart splits={splits} /></Card>
           <Card><HeartRateTrendChart splits={splits} /></Card>
-          <Card><HrPaceEfficiencyChart splits={splits} /></Card>
+          <Card><HrPaceEfficiencyChart splits={splits} granularity={granularity} /></Card>
           <Card><EffortScoreChart splits={splits} /></Card>
           <Card><PaceImprovementChart activities={activities} /></Card>
         </div>

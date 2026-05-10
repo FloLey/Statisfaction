@@ -70,6 +70,10 @@ SCHEMA = [
         interval_alt_ratio         DOUBLE PRECISION NOT NULL DEFAULT 0.60
     )
     """,
+    """
+    ALTER TABLE user_settings
+        ADD COLUMN IF NOT EXISTS iqr_multiplier DOUBLE PRECISION NOT NULL DEFAULT 2.5
+    """,
 ]
 
 
