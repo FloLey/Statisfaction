@@ -30,6 +30,7 @@ function makeActivity(
 ): Activity {
   return {
     id: 1,
+    user_id: 1,
     garmin_id: "1",
     name: "Run",
     distance_km: 10,
@@ -242,7 +243,6 @@ function makeSplitWithActivity(
   overrides: Partial<SplitWithActivity> & { split_number: number; activity_id: number },
 ): SplitWithActivity {
   return {
-    activity_id: overrides.activity_id,
     activity_name: "Test run",
     activity_date: "2026-01-01",
     distance_km: 1.0,
