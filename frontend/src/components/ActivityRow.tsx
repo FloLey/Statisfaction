@@ -6,6 +6,7 @@ import {
   formatDuration,
   formatPace,
 } from "../helpers";
+import RunTypeBadge from "./RunTypeBadge";
 
 interface Props {
   activity: Activity;
@@ -24,6 +25,9 @@ export default function ActivityRow({ activity }: Props) {
       </td>
       <td className="py-2 px-4 font-medium text-gray-900">
         {activity.name}
+      </td>
+      <td className="py-2 px-4">
+        <RunTypeBadge runType={activity.run_type} />
       </td>
       <td className="py-2 px-4">
         {formatDistance(activity.distance_km)}

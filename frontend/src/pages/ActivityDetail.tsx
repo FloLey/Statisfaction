@@ -9,6 +9,7 @@ import {
 } from "../helpers";
 import SplitCharts from "../components/charts/SplitCharts";
 import SplitsTable from "../components/SplitsTable";
+import RunTypeBadge from "../components/RunTypeBadge";
 
 export default function ActivityDetail() {
   const { activityId } = useParams<{ activityId: string }>();
@@ -68,9 +69,12 @@ export default function ActivityDetail() {
       {/* Header card */}
       <div className="bg-white rounded-lg shadow-sm p-5 mb-5">
         <div className="flex items-baseline justify-between mb-4">
-          <h1 className="text-lg font-semibold text-gray-900">
-            {activity.name}
-          </h1>
+          <div className="flex items-baseline gap-2">
+            <h1 className="text-lg font-semibold text-gray-900">
+              {activity.name}
+            </h1>
+            <RunTypeBadge runType={activity.run_type} />
+          </div>
           <span className="text-sm text-gray-400">
             {formatDate(activity.date)}
           </span>

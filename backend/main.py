@@ -18,6 +18,7 @@ from models import (
     SyncResponse,
     UserCreate,
     UserRead,
+    UserSettings,
 )
 
 _cors_env = os.getenv("CORS_ORIGINS", "http://localhost:7746")
@@ -35,9 +36,20 @@ app = FastAPI(title="Statisfaction API", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PUT"],
     allow_headers=["Content-Type"],
 )
+
+
+def _get_user_settings(user_id: int, cur) -> UserSettings:
+    """Fetch per-user classification settings, returning defaults if none saved."""
+    cur.execute("SELECT * FROM user_settings WHERE user_id = %s", (user_id,))
+    row = cur.fetchone()
+    if row:
+        row_dict = dict(row)
+        row_dict.pop("user_id", None)
+        return UserSettings(**row_dict)
+    return UserSettings()
 
 
 @app.get("/api/health")
@@ -131,7 +143,10 @@ def sync_activities(
         activity_id = cur.fetchone()["id"]
 
         try:
-            splits = garmin_mod.fetch_splits(client, normalized["garmin_id"])
+            settings = _get_user_settings(user_id, cur)
+            splits = garmin_mod.fetch_splits(
+                client, normalized["garmin_id"], settings=settings
+            )
             for s in splits:
                 cur.execute(
                     """INSERT INTO splits
@@ -150,6 +165,11 @@ def sync_activities(
                         s["split_type"],
                     ),
                 )
+            run_type = garmin_mod.classify_run_type(splits, settings=settings)
+            cur.execute(
+                "UPDATE activities SET run_type = %s WHERE id = %s",
+                (run_type, activity_id),
+            )
         except Exception:
             pass  # splits are nice-to-have
 
@@ -190,7 +210,7 @@ def get_activity(activity_id: int, conn=Depends(get_db)):
     cur = conn.cursor()
     cur.execute(
         "SELECT id, garmin_id, name, date, distance_km, duration_min,"
-        " avg_hr, max_hr, avg_pace_min_km, elevation_gain_m"
+        " avg_hr, max_hr, avg_pace_min_km, elevation_gain_m, run_type"
         " FROM activities WHERE id = %s",
         (activity_id,),
     )
@@ -217,6 +237,10 @@ def reclassify_splits(user_id: int, conn=Depends(get_db)):
     cur.execute("SELECT id FROM users WHERE id = %s", (user_id,))
     if not cur.fetchone():
         raise HTTPException(404, detail="User not found")
+
+    settings = _get_user_settings(user_id, cur)
+
+    # Step 1: reclassify individual splits by pace
     cur.execute(
         """SELECT s.id, s.pace_min_km
            FROM splits s
@@ -226,13 +250,84 @@ def reclassify_splits(user_id: int, conn=Depends(get_db)):
     )
     splits = cur.fetchall()
     for s in splits:
-        new_type = garmin_mod.classify_split(s["pace_min_km"])
+        new_type = garmin_mod.classify_split(s["pace_min_km"], settings=settings)
         cur.execute(
             "UPDATE splits SET split_type = %s WHERE id = %s",
             (new_type, s["id"]),
         )
+
+    # Step 2: compute run_type per activity (must come after splits are updated)
+    cur.execute(
+        "SELECT id FROM activities WHERE user_id = %s",
+        (user_id,),
+    )
+    activity_ids = [row["id"] for row in cur.fetchall()]
+    for act_id in activity_ids:
+        cur.execute(
+            """SELECT split_type, distance_km, elevation_gain_m, split_number
+               FROM splits WHERE activity_id = %s ORDER BY split_number""",
+            (act_id,),
+        )
+        act_splits = [dict(s) for s in cur.fetchall()]
+        run_type = garmin_mod.classify_run_type(act_splits, settings=settings)
+        cur.execute(
+            "UPDATE activities SET run_type = %s WHERE id = %s",
+            (run_type, act_id),
+        )
+
     conn.commit()
-    return {"updated_splits": len(splits)}
+    return {"updated_splits": len(splits), "updated_run_types": len(activity_ids)}
+
+
+@app.get("/api/users/{user_id}/settings", response_model=UserSettings)
+def get_user_settings(user_id: int, conn=Depends(get_db)):
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM users WHERE id = %s", (user_id,))
+    if not cur.fetchone():
+        raise HTTPException(404, detail="User not found")
+    return _get_user_settings(user_id, cur)
+
+
+@app.put("/api/users/{user_id}/settings", response_model=UserSettings)
+def update_user_settings(
+    user_id: int,
+    body: UserSettings,
+    conn=Depends(get_db),
+):
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM users WHERE id = %s", (user_id,))
+    if not cur.fetchone():
+        raise HTTPException(404, detail="User not found")
+    cur.execute(
+        """INSERT INTO user_settings (
+               user_id,
+               pace_fast_max_min_km, pace_walking_min_km, pace_idle_min_km,
+               long_run_min_km, hills_elev_per_km_threshold,
+               tempo_min_fast_fraction, interval_min_fast_splits, interval_alt_ratio
+           ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+           ON CONFLICT (user_id) DO UPDATE SET
+               pace_fast_max_min_km        = EXCLUDED.pace_fast_max_min_km,
+               pace_walking_min_km         = EXCLUDED.pace_walking_min_km,
+               pace_idle_min_km            = EXCLUDED.pace_idle_min_km,
+               long_run_min_km             = EXCLUDED.long_run_min_km,
+               hills_elev_per_km_threshold = EXCLUDED.hills_elev_per_km_threshold,
+               tempo_min_fast_fraction     = EXCLUDED.tempo_min_fast_fraction,
+               interval_min_fast_splits    = EXCLUDED.interval_min_fast_splits,
+               interval_alt_ratio          = EXCLUDED.interval_alt_ratio""",
+        (
+            user_id,
+            body.pace_fast_max_min_km,
+            body.pace_walking_min_km,
+            body.pace_idle_min_km,
+            body.long_run_min_km,
+            body.hills_elev_per_km_threshold,
+            body.tempo_min_fast_fraction,
+            body.interval_min_fast_splits,
+            body.interval_alt_ratio,
+        ),
+    )
+    conn.commit()
+    return body
 
 
 @app.get(

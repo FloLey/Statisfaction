@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useParams, useOutletContext } from "react-router-dom";
+import { useParams, useOutletContext, useNavigate } from "react-router-dom";
 import {
   getActivities,
   getUserSplits,
@@ -44,6 +44,7 @@ interface LayoutContext {
 export default function Activities() {
   const { userId } = useParams<{ userId: string }>();
   const { users } = useOutletContext<LayoutContext>();
+  const navigate = useNavigate();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [allSplits, setAllSplits] = useState<SplitWithActivity[]>([]);
   const [showSync, setShowSync] = useState(false);
@@ -203,6 +204,13 @@ export default function Activities() {
             </div>
           )}
           <button
+            onClick={() => navigate(`/users/${userId}/settings`)}
+            title="Classification settings"
+            className="px-3 py-1.5 text-sm border border-gray-300 bg-white text-gray-600 rounded-md hover:bg-gray-50 transition-colors"
+          >
+            ⚙️
+          </button>
+          <button
             onClick={() => setShowSync(true)}
             className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
           >
@@ -341,6 +349,7 @@ export default function Activities() {
                 <tr className="border-b border-gray-200 bg-gray-50 text-[11px] uppercase tracking-wider text-gray-500">
                   <th className="py-2.5 px-4 font-medium">Date</th>
                   <th className="py-2.5 px-4 font-medium">Name</th>
+                  <th className="py-2.5 px-4 font-medium">Type</th>
                   <th className="py-2.5 px-4 font-medium">Distance</th>
                   <th className="py-2.5 px-4 font-medium">Duration</th>
                   <th className="py-2.5 px-4 font-medium">Pace</th>
