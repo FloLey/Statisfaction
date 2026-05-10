@@ -1,21 +1,13 @@
 import { useState, useMemo, useEffect } from "react";
 import { Activity } from "../api";
 
-export type RunTypeFilter =
-  | "all"
-  | "tempo"
-  | "sprints"
-  | "hills"
-  | "easy"
-  | "long";
-
 export interface ActivityFilters {
   dateRange: "last30" | "last90" | "lastYear" | "all" | "custom";
   customFrom: string;
   customTo: string;
   distanceRange: "all" | "short" | "medium" | "long";
   nameSearch: string;
-  runType: RunTypeFilter;
+  runTypes: Set<string>;
 }
 
 const DEFAULT_FILTERS: ActivityFilters = {
@@ -24,7 +16,7 @@ const DEFAULT_FILTERS: ActivityFilters = {
   customTo: "",
   distanceRange: "all",
   nameSearch: "",
-  runType: "all",
+  runTypes: new Set(),
 };
 
 export function useActivityFilters(activities: Activity[]) {
@@ -76,7 +68,7 @@ export function useActivityFilters(activities: Activity[]) {
       )
         return false;
 
-      if (filters.runType !== "all" && a.run_type !== filters.runType)
+      if (filters.runTypes.size > 0 && !filters.runTypes.has(a.run_type ?? ""))
         return false;
 
       return true;
@@ -87,7 +79,7 @@ export function useActivityFilters(activities: Activity[]) {
     filters.customFrom,
     filters.customTo,
     filters.distanceRange,
-    filters.runType,
+    filters.runTypes,
     debouncedName,
   ]);
 
@@ -95,7 +87,7 @@ export function useActivityFilters(activities: Activity[]) {
     filters.dateRange !== "all" ||
     filters.distanceRange !== "all" ||
     filters.nameSearch !== "" ||
-    filters.runType !== "all";
+    filters.runTypes.size > 0;
 
   const clearFilters = () => setFilters(DEFAULT_FILTERS);
 
