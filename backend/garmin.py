@@ -15,11 +15,11 @@ PACE_WALKING_MIN_KM = 10.0
 PACE_FAST_MAX_MIN_KM = 4.0
 
 # Run-type classification thresholds
-INTERVAL_MIN_FAST_SPLITS = 2       # minimum fast splits to consider an interval pattern
-INTERVAL_ALT_RATIO = 0.60          # 60% of fast/recovery transitions must alternate
-HILLS_ELEV_PER_KM_THRESHOLD = 30.0 # m/km elevation on fast splits → hills (~3% grade)
-TEMPO_MIN_FAST_FRACTION = 0.15     # fast splits must be ≥15% of total distance → tempo
-LONG_RUN_MIN_KM = 12.0             # total distance threshold for "long"
+INTERVAL_MIN_FAST_SPLITS = 2  # minimum fast splits to consider an interval pattern
+INTERVAL_ALT_RATIO = 0.60  # 60% of fast/recovery transitions must alternate
+HILLS_ELEV_PER_KM_THRESHOLD = 30.0  # m/km elevation on fast splits → hills (~3% grade)
+TEMPO_MIN_FAST_FRACTION = 0.15  # fast splits must be ≥15% of total distance → tempo
+LONG_RUN_MIN_KM = 12.0  # total distance threshold for "long"
 
 
 def classify_split(

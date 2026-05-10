@@ -454,8 +454,17 @@ def test_run_type_in_activity_list(client):
             avg_hr, max_hr, avg_pace_min_km, elevation_gain_m, run_type)
            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
         (
-            user_id, "t1", "Tempo Run", "2026-03-15 08:00:00",
-            8.0, 40.0, 160, 180, 5.0, 20.0, "tempo",
+            user_id,
+            "t1",
+            "Tempo Run",
+            "2026-03-15 08:00:00",
+            8.0,
+            40.0,
+            160,
+            180,
+            5.0,
+            20.0,
+            "tempo",
         ),
     )
     conn.commit()
@@ -483,8 +492,17 @@ def test_run_type_in_activity_detail(client):
            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
            RETURNING id""",
         (
-            user_id, "t2", "Sprint Session", "2026-03-16 08:00:00",
-            6.0, 35.0, 165, 185, 5.5, 15.0, "sprints",
+            user_id,
+            "t2",
+            "Sprint Session",
+            "2026-03-16 08:00:00",
+            6.0,
+            35.0,
+            165,
+            185,
+            5.5,
+            15.0,
+            "sprints",
         ),
     )
     activity_id = cur.fetchone()["id"]
@@ -512,8 +530,16 @@ def test_run_type_null_when_not_set(client):
            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
            RETURNING id""",
         (
-            user_id, "t3", "Old Run", "2026-03-17 08:00:00",
-            5.0, 25.0, 150, 170, 5.0, 10.0,
+            user_id,
+            "t3",
+            "Old Run",
+            "2026-03-17 08:00:00",
+            5.0,
+            25.0,
+            150,
+            170,
+            5.0,
+            10.0,
         ),
     )
     activity_id = cur.fetchone()["id"]
@@ -541,8 +567,16 @@ def test_reclassify_sets_run_type(client):
            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
            RETURNING id""",
         (
-            user_id, "r1", "Intervals", "2026-03-18 08:00:00",
-            6.0, 30.0, 165, 190, 5.0, 10.0,
+            user_id,
+            "r1",
+            "Intervals",
+            "2026-03-18 08:00:00",
+            6.0,
+            30.0,
+            165,
+            190,
+            5.0,
+            10.0,
         ),
     )
     activity_id = cur.fetchone()["id"]
@@ -703,9 +737,7 @@ def test_reclassify_uses_custom_settings(client):
     # Verify split was reclassified as fast
     conn = db_mod._connect()
     cur = conn.cursor()
-    cur.execute(
-        "SELECT split_type FROM splits WHERE activity_id = %s", (activity_id,)
-    )
+    cur.execute("SELECT split_type FROM splits WHERE activity_id = %s", (activity_id,))
     row = cur.fetchone()
     conn.close()
     assert row["split_type"] == "fast"
