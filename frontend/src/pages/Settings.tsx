@@ -407,7 +407,7 @@ export default function Settings() {
       </div>
 
       {/* Run Type Classification */}
-      <div className="bg-white rounded-lg shadow-sm p-5 mb-5">
+      <div className="bg-white rounded-lg shadow-sm p-5 mb-4">
         <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-1">
           Run Type Classification
         </h2>
@@ -415,6 +415,29 @@ export default function Settings() {
           Thresholds used to label each run as Easy, Long, Tempo, Sprints, or Hills.
         </p>
         {RUN_TYPE_FIELDS.map(renderField)}
+      </div>
+
+      {/* Outlier Detection */}
+      <div className="bg-white rounded-lg shadow-sm p-5 mb-5">
+        <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-1">
+          Outlier Detection
+        </h2>
+        <p className="text-xs text-gray-400 mb-4">
+          Controls how aggressively unusual splits are flagged as outliers in charts.
+        </p>
+        {renderField({
+          key: "iqr_multiplier",
+          label: "IQR multiplier",
+          unit: "× IQR",
+          step: 0.5,
+          min: 0.5,
+          tooltip:
+            "Controls the width of the outlier detection fence. " +
+            "The fence is Q1 − N×IQR to Q3 + N×IQR across all non-idle splits combined. " +
+            "Lower = more splits flagged (stricter). Higher = only extreme values flagged (looser). " +
+            "1.5 is the standard statistical threshold; 2.5–3.0 is recommended for running data " +
+            "where fast and slow splits naturally span a wide range.",
+        })}
       </div>
 
       {/* Status message */}

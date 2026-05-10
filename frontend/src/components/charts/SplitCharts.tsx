@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { Split } from "../../api";
-import { markOutliers, filterSplitsByType } from "./chartHelpers";
+import { markOutliers, filterSplitsByType, DEFAULT_IQR_MULTIPLIER } from "./chartHelpers";
 import SplitPaceChart from "./SplitPaceChart";
 import SplitHeartRateChart from "./SplitHeartRateChart";
 import SplitElevationChart from "./SplitElevationChart";
@@ -13,25 +13,27 @@ const SPLIT_TYPE_LABELS: Record<string, string> = {
   running: "Running",
   walking: "Walking",
   idle: "Idle",
+  outliers: "Outliers",
 };
 
 interface Props {
   splits: Split[];
   avgPace: number | null;
+  iqrMultiplier?: number;
 }
 
-export default function SplitCharts({ splits, avgPace }: Props) {
+export default function SplitCharts({ splits, avgPace, iqrMultiplier = DEFAULT_IQR_MULTIPLIER }: Props) {
   const [selectedTypes, setSelectedTypes] = useState<Set<string>>(
     new Set(DEFAULT_SELECTED_TYPES),
   );
-  const [hideOutliers, setHideOutliers] = useState(true);
 
   if (splits.length === 0) return null;
 
-  const markedSplits = useMemo(() => markOutliers(splits), [splits]);
+  const markedSplits = useMemo(() => markOutliers(splits, iqrMultiplier), [splits, iqrMultiplier]);
+  const showOutliers = selectedTypes.has("outliers");
   const filtered = useMemo(
-    () => filterSplitsByType(markedSplits, selectedTypes, hideOutliers),
-    [markedSplits, selectedTypes, hideOutliers],
+    () => filterSplitsByType(markedSplits, selectedTypes, showOutliers),
+    [markedSplits, selectedTypes, showOutliers],
   );
 
   const outlierCount = markedSplits.filter((s) => s.isOutlier).length;
@@ -63,19 +65,19 @@ export default function SplitCharts({ splits, avgPace }: Props) {
               {SPLIT_TYPE_LABELS[type]}
             </label>
           ))}
-        </div>
-        <label className="flex items-center gap-1.5 text-sm text-gray-500 cursor-pointer border-l border-gray-200 pl-4">
-          <input
-            type="checkbox"
-            checked={hideOutliers}
-            onChange={(e) => setHideOutliers(e.target.checked)}
-            className="rounded border-gray-300"
-          />
-          Hide outliers
           {outlierCount > 0 && (
-            <span className="text-xs text-gray-400">({outlierCount})</span>
+            <label className="flex items-center gap-1.5 text-sm text-gray-500 cursor-pointer border-l border-gray-200 pl-4">
+              <input
+                type="checkbox"
+                checked={showOutliers}
+                onChange={() => toggleType("outliers")}
+                className="rounded border-gray-300"
+              />
+              {SPLIT_TYPE_LABELS["outliers"]}
+              <span className="text-xs text-gray-400">({outlierCount})</span>
+            </label>
           )}
-        </label>
+        </div>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <SplitPaceChart splits={filtered} avgPace={avgPace} />
