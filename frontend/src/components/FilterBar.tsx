@@ -1,4 +1,5 @@
-import { ActivityFilters, RunTypeFilter } from "../hooks/useActivityFilters";
+import { useState, useRef, useEffect } from "react";
+import { ActivityFilters } from "../hooks/useActivityFilters";
 
 interface Props {
   filters: ActivityFilters;
@@ -8,6 +9,15 @@ interface Props {
   totalCount: number;
   filteredCount: number;
 }
+
+const RUN_TYPE_LABELS: Record<string, string> = {
+  easy: "Easy",
+  long: "Long",
+  tempo: "Tempo",
+  sprints: "Sprints",
+  hills: "Hills",
+};
+const ALL_RUN_TYPES = ["easy", "long", "tempo", "sprints", "hills"];
 
 export default function FilterBar({
   filters,
@@ -19,6 +29,30 @@ export default function FilterBar({
 }: Props) {
   const set = (patch: Partial<ActivityFilters>) =>
     onChange({ ...filters, ...patch });
+
+  const [showRunTypeFilter, setShowRunTypeFilter] = useState(false);
+  const runTypeRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (runTypeRef.current && !runTypeRef.current.contains(e.target as Node)) {
+        setShowRunTypeFilter(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const toggleRunType = (type: string) => {
+    const next = new Set(filters.runTypes);
+    next.has(type) ? next.delete(type) : next.add(type);
+    set({ runTypes: next });
+  };
+
+  const runTypeLabel =
+    filters.runTypes.size === 0
+      ? "All run types"
+      : [...filters.runTypes].map((t) => RUN_TYPE_LABELS[t] ?? t).join(", ");
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-3 mb-4">
@@ -72,19 +106,36 @@ export default function FilterBar({
           <option value="long">Long (&gt;12 km)</option>
         </select>
 
-        {/* Run type */}
-        <select
-          value={filters.runType}
-          onChange={(e) => set({ runType: e.target.value as RunTypeFilter })}
-          className="text-sm border border-gray-200 rounded-md px-2.5 py-1.5 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="all">All types</option>
-          <option value="easy">Easy</option>
-          <option value="long">Long</option>
-          <option value="tempo">Tempo</option>
-          <option value="sprints">Sprints</option>
-          <option value="hills">Hills</option>
-        </select>
+        {/* Run type multi-select */}
+        <div className="relative" ref={runTypeRef}>
+          <button
+            onClick={() => setShowRunTypeFilter((v) => !v)}
+            className="flex items-center gap-1.5 text-sm border border-gray-200 rounded-md px-2.5 py-1.5 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700"
+          >
+            <span>{runTypeLabel}</span>
+            <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {showRunTypeFilter && (
+            <div className="absolute top-full left-0 mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-10 py-1">
+              {ALL_RUN_TYPES.map((type) => (
+                <label
+                  key={type}
+                  className="flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm text-gray-700"
+                >
+                  <input
+                    type="checkbox"
+                    checked={filters.runTypes.has(type)}
+                    onChange={() => toggleRunType(type)}
+                    className="rounded border-gray-300"
+                  />
+                  {RUN_TYPE_LABELS[type]}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Name search */}
         <input
