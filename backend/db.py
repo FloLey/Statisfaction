@@ -51,6 +51,25 @@ SCHEMA = [
         ADD COLUMN IF NOT EXISTS split_type TEXT
         CHECK (split_type IN ('running', 'walking', 'idle', 'fast'))
     """,
+    """
+    ALTER TABLE activities
+        ADD COLUMN IF NOT EXISTS run_type TEXT
+        CHECK (run_type IN ('tempo', 'sprints', 'hills', 'easy', 'long'))
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS user_settings (
+        user_id                    INTEGER PRIMARY KEY
+                                       REFERENCES users(id) ON DELETE CASCADE,
+        pace_fast_max_min_km       DOUBLE PRECISION NOT NULL DEFAULT 4.0,
+        pace_walking_min_km        DOUBLE PRECISION NOT NULL DEFAULT 10.0,
+        pace_idle_min_km           DOUBLE PRECISION NOT NULL DEFAULT 20.0,
+        long_run_min_km            DOUBLE PRECISION NOT NULL DEFAULT 12.0,
+        hills_elev_per_km_threshold DOUBLE PRECISION NOT NULL DEFAULT 30.0,
+        tempo_min_fast_fraction    DOUBLE PRECISION NOT NULL DEFAULT 0.15,
+        interval_min_fast_splits   INTEGER          NOT NULL DEFAULT 2,
+        interval_alt_ratio         DOUBLE PRECISION NOT NULL DEFAULT 0.60
+    )
+    """,
 ]
 
 

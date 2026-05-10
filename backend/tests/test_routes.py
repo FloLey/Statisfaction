@@ -415,6 +415,7 @@ def test_reclassify_splits(client):
     resp = client.post(f"/api/users/{user_id}/reclassify")
     assert resp.status_code == 200
     assert resp.json()["updated_splits"] == 3
+    assert resp.json()["updated_run_types"] == 1
 
     # Verify types were set correctly
     conn = db_mod._connect()
@@ -434,3 +435,309 @@ def test_reclassify_splits(client):
 def test_reclassify_user_not_found(client):
     resp = client.post("/api/users/999/reclassify")
     assert resp.status_code == 404
+
+
+# -- run_type --
+
+
+def test_run_type_in_activity_list(client):
+    resp = client.post("/api/users", json={"name": "Alice", "email": "a@g.com"})
+    user_id = resp.json()["id"]
+
+    import db as db_mod
+
+    conn = db_mod._connect()
+    cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO activities
+           (user_id, garmin_id, name, date, distance_km, duration_min,
+            avg_hr, max_hr, avg_pace_min_km, elevation_gain_m, run_type)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+        (
+            user_id,
+            "t1",
+            "Tempo Run",
+            "2026-03-15 08:00:00",
+            8.0,
+            40.0,
+            160,
+            180,
+            5.0,
+            20.0,
+            "tempo",
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    resp = client.get(f"/api/users/{user_id}/activities")
+    assert resp.status_code == 200
+    activities = resp.json()
+    assert len(activities) == 1
+    assert activities[0]["run_type"] == "tempo"
+
+
+def test_run_type_in_activity_detail(client):
+    resp = client.post("/api/users", json={"name": "Alice", "email": "a@g.com"})
+    user_id = resp.json()["id"]
+
+    import db as db_mod
+
+    conn = db_mod._connect()
+    cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO activities
+           (user_id, garmin_id, name, date, distance_km, duration_min,
+            avg_hr, max_hr, avg_pace_min_km, elevation_gain_m, run_type)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+           RETURNING id""",
+        (
+            user_id,
+            "t2",
+            "Sprint Session",
+            "2026-03-16 08:00:00",
+            6.0,
+            35.0,
+            165,
+            185,
+            5.5,
+            15.0,
+            "sprints",
+        ),
+    )
+    activity_id = cur.fetchone()["id"]
+    conn.commit()
+    conn.close()
+
+    resp = client.get(f"/api/activities/{activity_id}")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["run_type"] == "sprints"
+
+
+def test_run_type_null_when_not_set(client):
+    resp = client.post("/api/users", json={"name": "Alice", "email": "a@g.com"})
+    user_id = resp.json()["id"]
+
+    import db as db_mod
+
+    conn = db_mod._connect()
+    cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO activities
+           (user_id, garmin_id, name, date, distance_km, duration_min,
+            avg_hr, max_hr, avg_pace_min_km, elevation_gain_m)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+           RETURNING id""",
+        (
+            user_id,
+            "t3",
+            "Old Run",
+            "2026-03-17 08:00:00",
+            5.0,
+            25.0,
+            150,
+            170,
+            5.0,
+            10.0,
+        ),
+    )
+    activity_id = cur.fetchone()["id"]
+    conn.commit()
+    conn.close()
+
+    resp = client.get(f"/api/activities/{activity_id}")
+    assert resp.status_code == 200
+    assert resp.json()["run_type"] is None
+
+
+def test_reclassify_sets_run_type(client):
+    """After reclassify, activities with interval splits get a run_type."""
+    resp = client.post("/api/users", json={"name": "Alice", "email": "a@g.com"})
+    user_id = resp.json()["id"]
+
+    import db as db_mod
+
+    conn = db_mod._connect()
+    cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO activities
+           (user_id, garmin_id, name, date, distance_km, duration_min,
+            avg_hr, max_hr, avg_pace_min_km, elevation_gain_m)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+           RETURNING id""",
+        (
+            user_id,
+            "r1",
+            "Intervals",
+            "2026-03-18 08:00:00",
+            6.0,
+            30.0,
+            165,
+            190,
+            5.0,
+            10.0,
+        ),
+    )
+    activity_id = cur.fetchone()["id"]
+    # Insert alternating fast/idle splits (interval pattern)
+    for i, (pace, stype) in enumerate(
+        [(3.5, "fast"), (25.0, "idle"), (3.5, "fast"), (25.0, "idle"), (3.5, "fast")], 1
+    ):
+        cur.execute(
+            """INSERT INTO splits
+               (activity_id, split_number, distance_km,
+                duration_min, pace_min_km, avg_hr, elevation_gain_m, split_type)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+            (activity_id, i, 1.0, 5.0, pace, 160, 5.0, stype),
+        )
+    conn.commit()
+    conn.close()
+
+    resp = client.post(f"/api/users/{user_id}/reclassify")
+    assert resp.status_code == 200
+    assert resp.json()["updated_run_types"] == 1
+
+    resp = client.get(f"/api/activities/{activity_id}")
+    assert resp.json()["run_type"] == "sprints"
+
+
+# -- User settings --
+
+
+def test_get_settings_returns_defaults(client):
+    """GET settings for user with no saved settings returns default values."""
+    resp = client.post("/api/users", json={"name": "Alice", "email": "a@g.com"})
+    user_id = resp.json()["id"]
+
+    resp = client.get(f"/api/users/{user_id}/settings")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["pace_fast_max_min_km"] == 4.0
+    assert data["long_run_min_km"] == 12.0
+    assert data["interval_alt_ratio"] == 0.60
+
+
+def test_put_settings_upsert(client):
+    """PUT settings saves and GET returns updated values."""
+    resp = client.post("/api/users", json={"name": "Alice", "email": "a@g.com"})
+    user_id = resp.json()["id"]
+
+    new_settings = {
+        "pace_fast_max_min_km": 5.0,
+        "pace_walking_min_km": 10.0,
+        "pace_idle_min_km": 20.0,
+        "long_run_min_km": 15.0,
+        "hills_elev_per_km_threshold": 50.0,
+        "tempo_min_fast_fraction": 0.10,
+        "interval_min_fast_splits": 3,
+        "interval_alt_ratio": 0.70,
+    }
+    resp = client.put(f"/api/users/{user_id}/settings", json=new_settings)
+    assert resp.status_code == 200
+    assert resp.json()["pace_fast_max_min_km"] == 5.0
+
+    resp = client.get(f"/api/users/{user_id}/settings")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["pace_fast_max_min_km"] == 5.0
+    assert data["long_run_min_km"] == 15.0
+
+
+def test_put_settings_second_upsert(client):
+    """PUT settings twice correctly overwrites the first save."""
+    resp = client.post("/api/users", json={"name": "Alice", "email": "a@g.com"})
+    user_id = resp.json()["id"]
+
+    base = {
+        "pace_fast_max_min_km": 5.0,
+        "pace_walking_min_km": 10.0,
+        "pace_idle_min_km": 20.0,
+        "long_run_min_km": 12.0,
+        "hills_elev_per_km_threshold": 30.0,
+        "tempo_min_fast_fraction": 0.15,
+        "interval_min_fast_splits": 2,
+        "interval_alt_ratio": 0.60,
+    }
+    client.put(f"/api/users/{user_id}/settings", json=base)
+    base["pace_fast_max_min_km"] = 4.5
+    client.put(f"/api/users/{user_id}/settings", json=base)
+
+    resp = client.get(f"/api/users/{user_id}/settings")
+    assert resp.json()["pace_fast_max_min_km"] == 4.5
+
+
+def test_get_settings_user_not_found(client):
+    resp = client.get("/api/users/999/settings")
+    assert resp.status_code == 404
+
+
+def test_put_settings_user_not_found(client):
+    body = {
+        "pace_fast_max_min_km": 5.0,
+        "pace_walking_min_km": 10.0,
+        "pace_idle_min_km": 20.0,
+        "long_run_min_km": 12.0,
+        "hills_elev_per_km_threshold": 30.0,
+        "tempo_min_fast_fraction": 0.15,
+        "interval_min_fast_splits": 2,
+        "interval_alt_ratio": 0.60,
+    }
+    resp = client.put("/api/users/999/settings", json=body)
+    assert resp.status_code == 404
+
+
+def test_reclassify_uses_custom_settings(client):
+    """Reclassify with custom pace_fast_max_min_km=5.0 reclassifies splits."""
+    resp = client.post("/api/users", json={"name": "Alice", "email": "a@g.com"})
+    user_id = resp.json()["id"]
+
+    # Save custom settings: fast threshold at 5.0 min/km
+    client.put(
+        f"/api/users/{user_id}/settings",
+        json={
+            "pace_fast_max_min_km": 5.0,
+            "pace_walking_min_km": 10.0,
+            "pace_idle_min_km": 20.0,
+            "long_run_min_km": 12.0,
+            "hills_elev_per_km_threshold": 30.0,
+            "tempo_min_fast_fraction": 0.15,
+            "interval_min_fast_splits": 2,
+            "interval_alt_ratio": 0.60,
+        },
+    )
+
+    import db as db_mod
+
+    conn = db_mod._connect()
+    cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO activities
+           (user_id, garmin_id, name, date, distance_km, duration_min,
+            avg_hr, max_hr, avg_pace_min_km, elevation_gain_m)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+           RETURNING id""",
+        (user_id, "s1", "Tempo", "2026-03-20 08:00:00", 8.0, 40.0, 160, 180, 4.8, 20.0),
+    )
+    activity_id = cur.fetchone()["id"]
+    # Split at 4.5 min/km — running with default, but fast with threshold=5.0
+    cur.execute(
+        """INSERT INTO splits
+           (activity_id, split_number, distance_km,
+            duration_min, pace_min_km, avg_hr, elevation_gain_m)
+           VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+        (activity_id, 1, 2.0, 9.0, 4.5, 165, 5.0),
+    )
+    conn.commit()
+    conn.close()
+
+    resp = client.post(f"/api/users/{user_id}/reclassify")
+    assert resp.status_code == 200
+
+    # Verify split was reclassified as fast
+    conn = db_mod._connect()
+    cur = conn.cursor()
+    cur.execute("SELECT split_type FROM splits WHERE activity_id = %s", (activity_id,))
+    row = cur.fetchone()
+    conn.close()
+    assert row["split_type"] == "fast"

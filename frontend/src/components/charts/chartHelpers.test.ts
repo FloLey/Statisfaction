@@ -37,6 +37,7 @@ function makeActivity(
     max_hr: 170,
     avg_pace_min_km: 5.0,
     elevation_gain_m: 30,
+    run_type: null,
     ...overrides,
   };
 }

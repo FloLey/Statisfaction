@@ -1,4 +1,4 @@
-import { ActivityFilters } from "../hooks/useActivityFilters";
+import { ActivityFilters, RunTypeFilter } from "../hooks/useActivityFilters";
 
 interface Props {
   filters: ActivityFilters;
@@ -70,6 +70,20 @@ export default function FilterBar({
           <option value="short">Short (&lt;5 km)</option>
           <option value="medium">Medium (5-12 km)</option>
           <option value="long">Long (&gt;12 km)</option>
+        </select>
+
+        {/* Run type */}
+        <select
+          value={filters.runType}
+          onChange={(e) => set({ runType: e.target.value as RunTypeFilter })}
+          className="text-sm border border-gray-200 rounded-md px-2.5 py-1.5 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="all">All types</option>
+          <option value="easy">Easy</option>
+          <option value="long">Long</option>
+          <option value="tempo">Tempo</option>
+          <option value="sprints">Sprints</option>
+          <option value="hills">Hills</option>
         </select>
 
         {/* Name search */}

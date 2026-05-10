@@ -22,6 +22,7 @@ export interface Activity {
   max_hr: number | null;
   avg_pace_min_km: number | null;
   elevation_gain_m: number | null;
+  run_type: string | null;
 }
 
 export interface Split {
@@ -91,12 +92,42 @@ export async function getUserSplits(
   return data;
 }
 
+export interface UserSettings {
+  pace_fast_max_min_km: number;
+  pace_walking_min_km: number;
+  pace_idle_min_km: number;
+  long_run_min_km: number;
+  hills_elev_per_km_threshold: number;
+  tempo_min_fast_fraction: number;
+  interval_min_fast_splits: number;
+  interval_alt_ratio: number;
+}
+
+export async function getUserSettings(userId: number): Promise<UserSettings> {
+  const { data } = await api.get<UserSettings>(
+    `/api/users/${userId}/settings`,
+  );
+  return data;
+}
+
+export async function updateUserSettings(
+  userId: number,
+  settings: UserSettings,
+): Promise<UserSettings> {
+  const { data } = await api.put<UserSettings>(
+    `/api/users/${userId}/settings`,
+    settings,
+  );
+  return data;
+}
+
 export async function reclassifySplits(
   userId: number,
-): Promise<{ updated_splits: number }> {
-  const { data } = await api.post<{ updated_splits: number }>(
-    `/api/users/${userId}/reclassify`,
-  );
+): Promise<{ updated_splits: number; updated_run_types: number }> {
+  const { data } = await api.post<{
+    updated_splits: number;
+    updated_run_types: number;
+  }>(`/api/users/${userId}/reclassify`);
   return data;
 }
 
