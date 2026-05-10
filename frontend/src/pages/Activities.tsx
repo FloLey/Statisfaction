@@ -30,7 +30,7 @@ type View = "table" | "charts";
 type Granularity = "runs" | "splits";
 
 const ALL_SPLIT_TYPES = ["fast", "running", "walking", "idle"] as const;
-const DEFAULT_SELECTED_TYPES = new Set(["fast", "running", "walking"]);
+const DEFAULT_SELECTED_TYPES = new Set(["fast", "running", "walking", "outliers"]);
 
 const SPLIT_TYPE_LABELS: Record<string, string> = {
   fast: "Fast",
